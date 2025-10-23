@@ -1,109 +1,596 @@
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>不動産契約進捗管理（スタンドアロン）</title>
-
-  <!-- React 18 UMD -->
-  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-
-  <!-- Babel (ブラウザでJSX変換用) -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-  <!-- TailwindCSS（CDN） -->
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"/>
-
-  <style>
-    body { background: #f7fafc; font-feature-settings: "palt" 1; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>不動産契約進捗管理</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<script src="https://unpkg.com/lucide-react@0.320.0/dist/umd/lucide-react.min.js"></script>
 </head>
-<body>
-  <div id="root"></div>
+<body class="bg-gradient-to-br from-blue-50 via-white to-purple-50">
+<div id="root"></div>
 
-  <script type="text/babel">
-    // ====== lucide-react の代替：簡易SVGアイコン ======
-    const makeIcon = (label) => ({ className = "w-5 h-5", ...rest }) => (
-      <svg
-        className={className}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-label={label}
-        {...rest}
-      >
-        <rect x="3" y="3" width="18" height="18" rx="4" ry="4"></rect>
-        <text x="12" y="15" textAnchor="middle" fontSize="8" fontFamily="sans-serif">
-          {label?.[0] || "I"}
-        </text>
-      </svg>
+
+<script type="text/babel" data-type="module">
+const { useState, useMemo } = React;
+const {
+Bell, Plus, X, Calendar, User, Building2, AlertCircle, Check, Clock,
+ChevronRight, Users, MapPin, Briefcase, DollarSign, FileText, Upload,
+TrendingUp, BarChart3, Search, Filter, Download, Edit2, Save,
+LayoutDashboard, PieChart
+} = lucideReact;
+
+
+// React コンポーネントを貼り付け
+// （ユーザー提供の RealEstateTaskManager コンポーネントをそのまま使用）
+// ここに上記の React コード全体を貼り付けてください。
+import React, { useState, useMemo } from 'react';
+import { Bell, Plus, X, Calendar, User, Building2, AlertCircle, Check, Clock, ChevronRight, Users, MapPin, Briefcase, DollarSign, FileText, Upload, TrendingUp, BarChart3, Search, Filter, Download, Edit2, Save, LayoutDashboard, PieChart } from 'lucide-react';
+
+const RealEstateTaskManager = () => {
+  const [view, setView] = useState('dashboard');
+  const [selectedContract, setSelectedContract] = useState(1);
+  const [showNewContract, setShowNewContract] = useState(false);
+  const [showEditContract, setShowEditContract] = useState(false);
+  const [editingContract, setEditingContract] = useState(null);
+  const [editContractTab, setEditContractTab] = useState('basic'); // 'basic' or 'payments'
+  const [showTaskDetail, setShowTaskDetail] = useState(null);
+  const [isEditingTask, setIsEditingTask] = useState(false);
+  const [editedTask, setEditedTask] = useState(null);
+  const [showPaymentDetail, setShowPaymentDetail] = useState(null);
+  
+  // 売上管理の期間設定
+  const [salesPeriodType, setSalesPeriodType] = useState('month'); // 'month' or '21st'
+  const [salesYear, setSalesYear] = useState(2025);
+  const [salesMonth, setSalesMonth] = useState(10); // 現在の月
+  
+  // ステップフォーム用
+  const [currentStep, setCurrentStep] = useState(1);
+  const [editStep, setEditStep] = useState(1);
+  const totalSteps = 7;
+  
+  // フィルタリング・検索
+  const [searchQuery, setSearchQuery] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
+  const [officeFilter, setOfficeFilter] = useState('all');
+  
+  const [newContract, setNewContract] = useState({
+    propertyType: 'マンション', address: '', propertyName: '', roomNumber: '',
+    dealType: '仲介', buyerName: '', buyerKana: '', sellerName: '', sellerKana: '',
+    propertyPrice: '', outstandingDebt: '', consumptionTax: '', loanUsage: false,
+    loanApprovalDate: '', mortgageRemoval: false, arrears: false, demolition: false,
+    renovation: false, survey: false, contractDate: '', settlementDeadline: '',
+    confirmedSettlementDate: '', officeId: '', assigneeId: '',
+    // 買取再販用の手打ち売上
+    manualRevenue: '',
+    // 入金・支払い管理
+    buyerPaymentEnabled: false, buyerPaymentSplit: false,
+    buyerPayments: [{ category: '仲介手数料', amount: '', dueDate: '', method: '振込', receipt: '郵送' }],
+    sellerPaymentEnabled: false, sellerPaymentSplit: false,
+    sellerPayments: [{ category: '仲介手数料', amount: '', dueDate: '', method: '振込', receipt: '郵送' }],
+    vendor1PaymentEnabled: false,
+    vendor1Payments: [{ category: '紹介料', amount: '', dueDate: '', method: '振込', receipt: '郵送' }],
+    vendor2PaymentEnabled: false,
+    vendor2Payments: [{ category: '紹介料', amount: '', dueDate: '', method: '振込', receipt: '郵送' }],
+    vendor3PaymentEnabled: false,
+    vendor3Payments: [{ category: '紹介料', amount: '', dueDate: '', method: '振込', receipt: '郵送' }],
+    buyerExpenseEnabled: false,
+    buyerExpenses: [{ category: '返金', amount: '', dueDate: '', accountImages: [] }],
+    sellerExpenseEnabled: false,
+    sellerExpenses: [{ category: '手付金', amount: '', dueDate: '', accountImages: [] }],
+    vendor1ExpenseEnabled: false,
+    vendor1Expenses: [{ category: '仲介手数料', amount: '', dueDate: '', accountImages: [] }],
+    vendor2ExpenseEnabled: false,
+    vendor2Expenses: [{ category: '仲介手数料', amount: '', dueDate: '', accountImages: [] }],
+    vendor3ExpenseEnabled: false,
+    vendor3Expenses: [{ category: '仲介手数料', amount: '', dueDate: '', accountImages: [] }]
+  });
+
+  const [contracts, setContracts] = useState([
+    {
+      id: 1, propertyType: 'マンション', address: '東京都渋谷区神宮前1-1-1',
+      propertyName: 'パークマンション渋谷', roomNumber: '305', dealType: '仲介',
+      buyerName: '田中太郎', buyerKana: 'タナカタロウ', sellerName: '山田次郎',
+      sellerKana: 'ヤマダジロウ', propertyPrice: 50000000, outstandingDebt: 30000000,
+      consumptionTax: 0, manualRevenue: 0, loanUsage: true, loanApprovalDate: '2025-11-10',
+      mortgageRemoval: true, arrears: false, demolition: false, renovation: true,
+      survey: false, contractDate: '2025-10-15', settlementDeadline: '2025-11-30',
+      confirmedSettlementDate: '', assigneeId: 1, officeId: 1, status: '契約準備中', progress: 30,
+      buyerPayments: [], sellerPayments: [], vendor1Payments: [], vendor2Payments: [], vendor3Payments: [],
+      buyerExpenses: [], sellerExpenses: [], vendor1Expenses: [], vendor2Expenses: [], vendor3Expenses: []
+    }
+  ]);
+
+  const [tasks, setTasks] = useState([
+    { id: 1, contractId: 1, type: '入金', title: '買主から仲介手数料入金', amount: 1500000, purpose: '仲介手数料', paymentMethod: '振込', receiptDelivery: '郵送', dueDate: '2025-11-30', status: 'pending', assigneeId: 1, priority: 'high', paymentCompleted: false },
+    { id: 2, contractId: 1, type: '抵当権抹消', title: '抵当権抹消事前手続き', dueDate: '2025-10-30', status: 'in-progress', assigneeId: 1, priority: 'high', paymentCompleted: false },
+    { id: 3, contractId: 1, type: '買主融資管理', title: '融資承認手続き', dueDate: '2025-11-09', status: 'pending', assigneeId: 1, priority: 'high', paymentCompleted: false },
+    { id: 4, contractId: 1, type: 'リフォーム管理', title: 'リフォーム手配', dueDate: '2025-10-30', status: 'pending', assigneeId: 1, priority: 'medium', paymentCompleted: false },
+    { id: 5, contractId: 1, type: '収入印紙手配', title: '買主 収入印紙手配', stampAmount: 20000, dueDate: '2025-11-28', status: 'done', assigneeId: 1, priority: 'high', party: '買主', paymentCompleted: false },
+    { id: 6, contractId: 1, type: '収入印紙手配', title: '売主 収入印紙手配', stampAmount: 20000, dueDate: '2025-11-28', status: 'pending', assigneeId: 1, priority: 'high', party: '売主', paymentCompleted: false }
+  ]);
+
+  const [offices, setOffices] = useState([
+    { id: 1, name: '渋谷営業所', address: '東京都渋谷区' },
+    { id: 2, name: '新宿営業所', address: '東京都新宿区' },
+    { id: 3, name: '横浜営業所', address: '神奈川県横浜市' }
+  ]);
+
+  const [staff, setStaff] = useState([
+    { id: 1, name: '山田花子', officeId: 1, role: '営業担当' },
+    { id: 2, name: '鈴木一郎', officeId: 1, role: '営業担当' },
+    { id: 3, name: '田中次郎', officeId: 2, role: '所長' },
+    { id: 4, name: '佐藤美咲', officeId: 2, role: '経理' }
+  ]);
+
+  const [showAddOffice, setShowAddOffice] = useState(false);
+  const [showAddStaff, setShowAddStaff] = useState(false);
+  const [newOffice, setNewOffice] = useState({ name: '', address: '' });
+  const [newStaff, setNewStaff] = useState({ name: '', officeId: '', role: '営業担当', email: '' });
+
+  const propertyTypes = ['マンション', '土地', '戸建て', '収益物件', '事業用物件'];
+  const dealTypes = ['買取再販', '仲介'];
+  const taskTypes = ['入金', '支払い', '抵当権抹消', '買主融資管理', 'リフォーム管理', '解体管理', '測量管理', '契約書管理', '決済案内', '司法書士管理', '収入印紙手配', '手付金預かり返金'];
+
+  const getOfficeName = (officeId) => {
+    const office = offices.find(o => o.id === officeId);
+    return office ? office.name : '未設定';
+  };
+
+  const getStaffName = (staffId) => {
+    const staffMember = staff.find(s => s.id === staffId);
+    return staffMember ? staffMember.name : '未割当';
+  };
+
+  const getOfficeStaff = (officeId) => staff.filter(s => s.officeId === officeId);
+
+  const handleDeleteOffice = (officeId) => {
+    if (confirm('この営業所を削除しますか？')) {
+      setOffices(prev => prev.filter(o => o.id !== officeId));
+      setStaff(prev => prev.filter(s => s.officeId !== officeId));
+    }
+  };
+
+  const handleDeleteStaff = (staffId) => {
+    if (confirm('このスタッフを削除しますか？')) {
+      setStaff(prev => prev.filter(s => s.id !== staffId));
+    }
+  };
+
+  const updateTaskStatus = (taskId, newStatus) => {
+    setTasks(prev => prev.map(t => (t.id === taskId ? { ...t, status: newStatus } : t)));
+  };
+
+  const handlePaymentComplete = (taskId, taskType) => {
+    setTasks(prev => prev.map(t => 
+      t.id === taskId ? { ...t, paymentCompleted: true, status: 'done' } : t
+    ));
+    setShowPaymentDetail(null);
+    alert(`${taskType}が完了しました！売上に反映されました。`);
+  };
+
+  const handleEditTask = () => {
+    setIsEditingTask(true);
+    setEditedTask({ ...showTaskDetail });
+  };
+
+  const handleSaveTask = () => {
+    setTasks(prev => prev.map(t => (t.id === editedTask.id ? { ...editedTask, paymentCompleted: t.paymentCompleted || false } : t)));
+    setShowTaskDetail(editedTask);
+    setIsEditingTask(false);
+    alert('タスクが更新されました');
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditingTask(false);
+    setEditedTask(null);
+  };
+
+  // フィルタリング機能
+  const isToday = (dateStr) => {
+    const today = new Date('2025-10-21');
+    const date = new Date(dateStr);
+    return date.toDateString() === today.toDateString();
+  };
+
+  const isThisWeek = (dateStr) => {
+    const today = new Date('2025-10-21');
+    const date = new Date(dateStr);
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay());
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 7);
+    return date >= weekStart && date < weekEnd;
+  };
+
+  const filteredTasks = useMemo(() => {
+    let filtered = tasks.filter(t => t.contractId === selectedContract);
+
+    // 検索フィルタ
+    if (searchQuery) {
+      filtered = filtered.filter(t => 
+        t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.type.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    return filtered;
+  }, [tasks, selectedContract, searchQuery]);
+
+  // 営業所でフィルタリングされた契約一覧
+  const filteredContracts = useMemo(() => {
+    if (officeFilter === 'all') {
+      return contracts;
+    }
+    return contracts.filter(c => c.officeId === parseInt(officeFilter));
+  }, [contracts, officeFilter]);
+
+  // データエクスポート機能
+  const exportToCSV = (data, filename) => {
+    if (data.length === 0) {
+      alert('エクスポートするデータがありません');
+      return;
+    }
+
+    const headers = Object.keys(data[0]).join(',');
+    const rows = data.map(item => 
+      Object.values(item).map(val => 
+        typeof val === 'string' && val.includes(',') ? `"${val}"` : val
+      ).join(',')
     );
+    const csv = [headers, ...rows].join('\n');
+    
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
 
-    const Bell = makeIcon('Bell');
-    const Plus = makeIcon('Plus');
-    const X = makeIcon('X');
-    const Calendar = makeIcon('Cal');
-    const User = makeIcon('User');
-    const Building2 = makeIcon('Bld');
-    const AlertCircle = makeIcon('!');
-    const Check = makeIcon('OK');
-    const Clock = makeIcon('Clk');
-    const ChevronRight = makeIcon('>');
-    const Users = makeIcon('Usr');
-    const MapPin = makeIcon('Pin');
-    const Briefcase = makeIcon('Job');
-    const DollarSign = makeIcon('¥');
-    const FileText = makeIcon('Doc');
-    const Upload = makeIcon('Up');
-    const TrendingUp = makeIcon('UpT');
-    const BarChart3 = makeIcon('Bar');
-    const Search = makeIcon('Srch');
-    const Filter = makeIcon('Fltr');
-    const Download = makeIcon('DL');
-    const Edit2 = makeIcon('Edt');
-    const Save = makeIcon('Sav');
-    const LayoutDashboard = makeIcon('Dsh');
-    const PieChart = makeIcon('Pie');
+  const handleExportContracts = () => {
+    const exportData = contracts.map(c => ({
+      物件ID: c.id,
+      物件種別: c.propertyType,
+      住所: c.address,
+      物件名: c.propertyName || '',
+      買主: c.buyerName,
+      売主: c.sellerName,
+      物件金額: c.propertyPrice,
+      契約日: c.contractDate,
+      決済期日: c.settlementDeadline,
+      営業所: getOfficeName(c.officeId),
+      担当者: getStaffName(c.assigneeId),
+      進捗: `${c.progress}%`
+    }));
+    exportToCSV(exportData, '契約一覧');
+  };
 
-    // ====== React本体 ======
-    const { useState, useMemo } = React;
+  const handleExportTasks = () => {
+    const exportData = tasks.map(t => ({
+      タスクID: t.id,
+      契約ID: t.contractId,
+      タスク種別: t.type,
+      タイトル: t.title,
+      期日: t.dueDate,
+      ステータス: t.status,
+      優先度: t.priority,
+      担当者: getStaffName(t.assigneeId),
+      金額: t.amount || ''
+    }));
+    exportToCSV(exportData, 'タスク一覧');
+  };
 
-    const RealEstateTaskManager = () => {
-      const [view, setView] = useState('dashboard');
-      const [selectedContract, setSelectedContract] = useState(1);
-      const [showNewContract, setShowNewContract] = useState(false);
-      const [showEditContract, setShowEditContract] = useState(false);
-      const [editingContract, setEditingContract] = useState(null);
-      const [editContractTab, setEditContractTab] = useState('basic');
-      const [showTaskDetail, setShowTaskDetail] = useState(null);
-      const [isEditingTask, setIsEditingTask] = useState(false);
-      const [editedTask, setEditedTask] = useState(null);
-      const [showPaymentDetail, setShowPaymentDetail] = useState(null);
+  // ダッシュボード統計
+  const dashboardStats = useMemo(() => {
+    const allTasks = tasks;
+    const today = new Date('2025-10-21');
+    
+    return {
+      totalContracts: contracts.length,
+      activeContracts: contracts.filter(c => c.progress < 100).length,
+      totalTasks: allTasks.length,
+      pendingTasks: allTasks.filter(t => t.status === 'pending').length,
+      inProgressTasks: allTasks.filter(t => t.status === 'in-progress').length,
+      completedTasks: allTasks.filter(t => t.status === 'done').length,
+      todayTasks: allTasks.filter(t => isToday(t.dueDate)).length,
+      highPriorityTasks: allTasks.filter(t => t.priority === 'high' && t.status !== 'done').length,
+      completionRate: allTasks.length > 0 ? Math.round((allTasks.filter(t => t.status === 'done').length / allTasks.length) * 100) : 0,
+      totalRevenue: contracts.reduce((sum, c) => sum + (c.propertyPrice * 0.03), 0)
+    };
+  }, [contracts, tasks]);
 
-      const [salesPeriodType, setSalesPeriodType] = useState('month');
-      const [salesYear, setSalesYear] = useState(2025);
-      const [salesMonth, setSalesMonth] = useState(10);
+  // 売上統計（営業所別）
+  const salesStats = useMemo(() => {
+    // 期間の開始日と終了日を計算
+    let startDate, endDate;
+    
+    if (salesPeriodType === 'month') {
+      // 月初～月末
+      startDate = new Date(salesYear, salesMonth - 1, 1);
+      endDate = new Date(salesYear, salesMonth, 0); // 月末日
+    } else {
+      // 前月21日～当月20日
+      startDate = new Date(salesYear, salesMonth - 2, 21); // 前月21日
+      endDate = new Date(salesYear, salesMonth - 1, 20); // 当月20日
+    }
+    
+    // 日付を文字列に変換（比較用）
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
+    
+    const statsByOffice = {};
+    
+    offices.forEach(office => {
+      // この営業所の入金タスクを取得（期間内）
+      const officeTasks = tasks.filter(t => {
+        const contract = contracts.find(c => c.id === t.contractId);
+        return contract && contract.officeId === office.id && t.type === '入金' && t.amount &&
+               t.dueDate >= startDateStr && t.dueDate <= endDateStr;
+      });
+      
+      // 入金済み分
+      const completedAmount = officeTasks
+        .filter(t => t.paymentCompleted)
+        .reduce((sum, t) => sum + (t.amount || 0), 0);
+      
+      // 入金予定分
+      const pendingAmount = officeTasks
+        .filter(t => !t.paymentCompleted)
+        .reduce((sum, t) => sum + (t.amount || 0), 0);
+      
+      // 買取再販の手打ち売上も追加（契約日が期間内のもの）
+      const officeContracts = contracts.filter(c => 
+        c.officeId === office.id && 
+        c.dealType === '買取再販' &&
+        c.contractDate >= startDateStr &&
+        c.contractDate <= endDateStr
+      );
+      const manualRevenueTotal = officeContracts.reduce((sum, c) => sum + (c.manualRevenue || 0), 0);
+      
+      statsByOffice[office.id] = {
+        officeName: office.name,
+        completed: completedAmount,
+        pending: pendingAmount + manualRevenueTotal,
+        total: completedAmount + pendingAmount + manualRevenueTotal
+      };
+    });
+    
+    // 全体の合計
+    const totalCompleted = Object.values(statsByOffice).reduce((sum, s) => sum + s.completed, 0);
+    const totalPending = Object.values(statsByOffice).reduce((sum, s) => sum + s.pending, 0);
+    
+    return {
+      byOffice: statsByOffice,
+      totalCompleted,
+      totalPending,
+      total: totalCompleted + totalPending,
+      periodStart: startDate,
+      periodEnd: endDate
+    };
+  }, [tasks, contracts, offices, salesPeriodType, salesYear, salesMonth]);
 
-      const [currentStep, setCurrentStep] = useState(1);
-      const [editStep, setEditStep] = useState(1);
-      const totalSteps = 7;
+  const calculateDateOffset = (baseDate, offsetDays, offsetMonths) => {
+    const date = new Date(baseDate);
+    if (offsetMonths) {
+      date.setMonth(date.getMonth() - offsetMonths);
+    }
+    if (offsetDays) {
+      date.setDate(date.getDate() - offsetDays);
+    }
+    return date.toISOString().split('T')[0];
+  };
 
-      const [searchQuery, setSearchQuery] = useState('');
-      const [priorityFilter, setPriorityFilter] = useState('all');
-      const [typeFilter, setTypeFilter] = useState('all');
-      const [statusFilter, setStatusFilter] = useState('all');
-      const [dateFilter, setDateFilter] = useState('all');
-      const [showFilters, setShowFilters] = useState(false);
-      const [officeFilter, setOfficeFilter] = useState('all');
+  const generateAutoTasks = (contract) => {
+    const newTasks = [];
+    const baseDate = contract.confirmedSettlementDate || contract.settlementDeadline;
+    let taskId = tasks.length + 1;
 
-      // 🔧 追加：モーダル表示用 state（未定義エラーの原因）
-      const [showAddOffice, setShowAddOffice] = useState(false);
-      const [showAddStaff, setShowAddStaff] = useState(false);
+    newTasks.push({
+      id: taskId++, contractId: contract.id, type: '契約書管理',
+      title: '重要事項説明書・契約書アップロード', dueDate: contract.contractDate,
+      status: 'pending', assigneeId: contract.assigneeId, priority: 'high', paymentCompleted: false
+    });
 
-      const [newContract, setNewContract] = useState({
+    newTasks.push({
+      id: taskId++, contractId: contract.id, type: '決済案内',
+      title: '決済案内・清算書作成', dueDate: calculateDateOffset(baseDate, 7, 0),
+      status: 'pending', assigneeId: contract.assigneeId, priority: 'high', paymentCompleted: false
+    });
+
+    newTasks.push({
+      id: taskId++, contractId: contract.id, type: '司法書士管理',
+      title: '司法書士 登記手配', dueDate: calculateDateOffset(baseDate, 0, 1),
+      status: 'pending', assigneeId: contract.assigneeId, priority: 'high', paymentCompleted: false
+    });
+
+    const stampAmount = contract.propertyPrice > 50000000 ? 30000 : 20000;
+    newTasks.push({
+      id: taskId++, contractId: contract.id, type: '収入印紙手配',
+      title: '買主 収入印紙手配', stampAmount: stampAmount,
+      dueDate: calculateDateOffset(baseDate, 2, 0), status: 'pending',
+      assigneeId: contract.assigneeId, priority: 'high', party: '買主', paymentCompleted: false
+    });
+
+    newTasks.push({
+      id: taskId++, contractId: contract.id, type: '収入印紙手配',
+      title: '売主 収入印紙手配', stampAmount: stampAmount,
+      dueDate: calculateDateOffset(baseDate, 2, 0), status: 'pending',
+      assigneeId: contract.assigneeId, priority: 'high', party: '売主', paymentCompleted: false
+    });
+
+    if (contract.outstandingDebt > 0 && contract.mortgageRemoval) {
+      newTasks.push({
+        id: taskId++, contractId: contract.id, type: '抵当権抹消',
+        title: '抵当権抹消事前手続き', dueDate: calculateDateOffset(baseDate, 0, 1),
+        status: 'pending', assigneeId: contract.assigneeId, priority: 'high', paymentCompleted: false
+      });
+    }
+
+    if (contract.loanUsage) {
+      newTasks.push({
+        id: taskId++, contractId: contract.id, type: '買主融資管理',
+        title: '融資承認手続き', dueDate: calculateDateOffset(baseDate, 21, 0),
+        status: 'pending', assigneeId: contract.assigneeId, priority: 'high', paymentCompleted: false
+      });
+    }
+
+    if (contract.demolition) {
+      newTasks.push({
+        id: taskId++, contractId: contract.id, type: '解体管理',
+        title: '解体業者手配', dueDate: calculateDateOffset(baseDate, 0, 3),
+        status: 'pending', assigneeId: contract.assigneeId, priority: 'medium', paymentCompleted: false
+      });
+    }
+
+    if (contract.survey) {
+      newTasks.push({
+        id: taskId++, contractId: contract.id, type: '測量管理',
+        title: '測量業者手配', dueDate: calculateDateOffset(baseDate, 0, 4),
+        status: 'pending', assigneeId: contract.assigneeId, priority: 'medium', paymentCompleted: false
+      });
+    }
+
+    if (contract.renovation) {
+      newTasks.push({
+        id: taskId++, contractId: contract.id, type: 'リフォーム管理',
+        title: 'リフォーム業者手配', dueDate: calculateDateOffset(baseDate, 0, 1),
+        status: 'pending', assigneeId: contract.assigneeId, priority: 'medium', paymentCompleted: false
+      });
+    }
+
+    if (contract.outstandingDebt > contract.propertyPrice) {
+      newTasks.push({
+        id: taskId++, contractId: contract.id, type: '手付金預かり返金',
+        title: '手付金預かり分返金手続き',
+        dueDate: contract.confirmedSettlementDate || contract.settlementDeadline,
+        status: 'pending', assigneeId: contract.assigneeId, priority: 'high', paymentCompleted: false
+      });
+    }
+
+    return newTasks;
+  };
+
+  const handleAddContract = () => {
+    // マンションの場合と他の物件の場合で条件を分ける
+    const isValid = newContract.propertyType === 'マンション' 
+      ? newContract.propertyName && newContract.roomNumber && newContract.buyerName && newContract.sellerName && newContract.officeId && newContract.assigneeId
+      : newContract.address && newContract.buyerName && newContract.sellerName && newContract.officeId && newContract.assigneeId;
+    
+    // 金額検証
+    const isPriceValid = newContract.dealType === '買取再販' 
+      ? newContract.manualRevenue
+      : newContract.propertyPrice && newContract.outstandingDebt;
+    
+    if (isValid && isPriceValid) {
+      const contract = {
+        id: contracts.length + 1,
+        propertyType: newContract.propertyType,
+        address: newContract.propertyType === 'マンション' ? newContract.propertyName : newContract.address,
+        propertyName: newContract.propertyName,
+        roomNumber: newContract.roomNumber,
+        dealType: newContract.dealType,
+        buyerName: newContract.buyerName,
+        buyerKana: newContract.buyerKana,
+        sellerName: newContract.sellerName,
+        sellerKana: newContract.sellerKana,
+        propertyPrice: parseInt(newContract.propertyPrice) || 0,
+        outstandingDebt: parseInt(newContract.outstandingDebt) || 0,
+        consumptionTax: parseInt(newContract.consumptionTax) || 0,
+        manualRevenue: parseInt(newContract.manualRevenue) || 0,
+        loanUsage: newContract.loanUsage,
+        loanApprovalDate: newContract.loanApprovalDate,
+        mortgageRemoval: newContract.mortgageRemoval,
+        arrears: newContract.arrears,
+        demolition: newContract.demolition,
+        renovation: newContract.renovation,
+        survey: newContract.survey,
+        contractDate: newContract.contractDate,
+        settlementDeadline: newContract.settlementDeadline,
+        confirmedSettlementDate: newContract.confirmedSettlementDate,
+        officeId: parseInt(newContract.officeId),
+        assigneeId: parseInt(newContract.assigneeId),
+        status: '契約準備中',
+        progress: 0,
+        // 入金・支払いデータも保存
+        buyerPayments: newContract.buyerPaymentEnabled && !newContract.buyerPaymentSplit ? newContract.buyerPayments : [],
+        sellerPayments: newContract.sellerPaymentEnabled && !newContract.sellerPaymentSplit ? newContract.sellerPayments : [],
+        vendor1Payments: newContract.vendor1PaymentEnabled ? newContract.vendor1Payments : [],
+        vendor2Payments: newContract.vendor2PaymentEnabled ? newContract.vendor2Payments : [],
+        vendor3Payments: newContract.vendor3PaymentEnabled ? newContract.vendor3Payments : [],
+        buyerExpenses: newContract.buyerExpenseEnabled ? newContract.buyerExpenses : [],
+        sellerExpenses: newContract.sellerExpenseEnabled ? newContract.sellerExpenses : [],
+        vendor1Expenses: newContract.vendor1ExpenseEnabled ? newContract.vendor1Expenses : [],
+        vendor2Expenses: newContract.vendor2ExpenseEnabled ? newContract.vendor2Expenses : [],
+        vendor3Expenses: newContract.vendor3ExpenseEnabled ? newContract.vendor3Expenses : []
+      };
+      
+      setContracts([...contracts, contract]);
+      
+      // 自動タスク生成
+      const autoTasks = generateAutoTasks(contract);
+      
+      // 入金・支払いタスクを生成
+      const paymentTasks = [];
+      let taskId = tasks.length + autoTasks.length + 1;
+      
+      // 買主からの入金タスク
+      if (contract.buyerPayments.length > 0) {
+        contract.buyerPayments.forEach(payment => {
+          if (payment.amount && payment.dueDate) {
+            paymentTasks.push({
+              id: taskId++,
+              contractId: contract.id,
+              type: '入金',
+              title: `買主から${payment.category}`,
+              amount: parseInt(payment.amount),
+              purpose: payment.category,
+              paymentMethod: payment.method,
+              receiptDelivery: payment.receipt,
+              dueDate: payment.dueDate,
+              status: 'pending',
+              assigneeId: contract.assigneeId,
+              priority: 'high',
+              paymentCompleted: false
+            });
+          }
+        });
+      }
+      
+      // 売主からの入金タスク
+      if (contract.sellerPayments.length > 0) {
+        contract.sellerPayments.forEach(payment => {
+          if (payment.amount && payment.dueDate) {
+            paymentTasks.push({
+              id: taskId++,
+              contractId: contract.id,
+              type: '入金',
+              title: `売主から${payment.category}`,
+              amount: parseInt(payment.amount),
+              purpose: payment.category,
+              paymentMethod: payment.method,
+              receiptDelivery: payment.receipt,
+              dueDate: payment.dueDate,
+              status: 'pending',
+              assigneeId: contract.assigneeId,
+              priority: 'high',
+              paymentCompleted: false
+            });
+          }
+        });
+      }
+      
+      setTasks([...tasks, ...autoTasks, ...paymentTasks]);
+      setSelectedContract(contract.id);
+      setShowNewContract(false);
+      setCurrentStep(1);
+      
+      setNewContract({
         propertyType: 'マンション', address: '', propertyName: '', roomNumber: '',
         dealType: '仲介', buyerName: '', buyerKana: '', sellerName: '', sellerKana: '',
         propertyPrice: '', outstandingDebt: '', consumptionTax: '', loanUsage: false,
@@ -132,84 +619,2634 @@
         vendor3ExpenseEnabled: false,
         vendor3Expenses: [{ category: '仲介手数料', amount: '', dueDate: '', accountImages: [] }]
       });
+      
+      alert('物件を登録しました！');
+    }
+  };
 
-      const [contracts, setContracts] = useState([
-        {
-          id: 1, propertyType: 'マンション', address: '東京都渋谷区神宮前1-1-1',
-          propertyName: 'パークマンション渋谷', roomNumber: '305', dealType: '仲介',
-          buyerName: '田中太郎', buyerKana: 'タナカタロウ', sellerName: '山田次郎',
-          sellerKana: 'ヤマダジロウ', propertyPrice: 50000000, outstandingDebt: 30000000,
-          consumptionTax: 0, manualRevenue: 0, loanUsage: true, loanApprovalDate: '2025-11-10',
-          mortgageRemoval: true, arrears: false, demolition: false, renovation: true,
-          survey: false, contractDate: '2025-10-15', settlementDeadline: '2025-11-30',
-          confirmedSettlementDate: '', assigneeId: 1, officeId: 1, status: '契約準備中', progress: 30,
-          buyerPayments: [], sellerPayments: [], vendor1Payments: [], vendor2Payments: [], vendor3Payments: [],
-          buyerExpenses: [], sellerExpenses: [], vendor1Expenses: [], vendor2Expenses: [], vendor3Expenses: []
-        }
-      ]);
+  const handleEditContractOpen = (contract) => {
+    // 既存の入金・支払いタスクを取得
+    const contractTasks = tasks.filter(t => t.contractId === contract.id);
+    
+    // 入金タスクを分類
+    const buyerPayments = contractTasks.filter(t => t.type === '入金' && t.title.includes('買主'));
+    const sellerPayments = contractTasks.filter(t => t.type === '入金' && t.title.includes('売主'));
+    const vendor1Payments = contractTasks.filter(t => t.type === '入金' && t.title.includes('業者1'));
+    const vendor2Payments = contractTasks.filter(t => t.type === '入金' && t.title.includes('業者2'));
+    const vendor3Payments = contractTasks.filter(t => t.type === '入金' && t.title.includes('業者3'));
+    
+    // 支払いタスクを分類
+    const buyerExpenses = contractTasks.filter(t => t.type === '支払い' && t.title.includes('買主'));
+    const sellerExpenses = contractTasks.filter(t => t.type === '支払い' && t.title.includes('売主'));
+    const vendor1Expenses = contractTasks.filter(t => t.type === '支払い' && t.title.includes('業者1'));
+    const vendor2Expenses = contractTasks.filter(t => t.type === '支払い' && t.title.includes('業者2'));
+    const vendor3Expenses = contractTasks.filter(t => t.type === '支払い' && t.title.includes('業者3'));
+    
+    setEditingContract({ 
+      ...contract,
+      buyerPayments: buyerPayments.length > 0 ? buyerPayments.map(t => ({
+        id: t.id,
+        category: t.purpose || '仲介手数料',
+        amount: t.amount || '',
+        dueDate: t.dueDate || '',
+        method: t.paymentMethod || '振込',
+        receipt: t.receiptDelivery || '郵送'
+      })) : [{ category: '仲介手数料', amount: '', dueDate: '', method: '振込', receipt: '郵送' }],
+      sellerPayments: sellerPayments.length > 0 ? sellerPayments.map(t => ({
+        id: t.id,
+        category: t.purpose || '仲介手数料',
+        amount: t.amount || '',
+        dueDate: t.dueDate || '',
+        method: t.paymentMethod || '振込',
+        receipt: t.receiptDelivery || '郵送'
+      })) : [{ category: '仲介手数料', amount: '', dueDate: '', method: '振込', receipt: '郵送' }],
+      vendor1Payments: vendor1Payments.length > 0 ? vendor1Payments.map(t => ({
+        id: t.id,
+        category: t.purpose || '紹介料',
+        amount: t.amount || '',
+        dueDate: t.dueDate || '',
+        method: t.paymentMethod || '振込',
+        receipt: t.receiptDelivery || '郵送'
+      })) : [{ category: '紹介料', amount: '', dueDate: '', method: '振込', receipt: '郵送' }],
+      vendor2Payments: vendor2Payments.length > 0 ? vendor2Payments.map(t => ({
+        id: t.id,
+        category: t.purpose || '紹介料',
+        amount: t.amount || '',
+        dueDate: t.dueDate || '',
+        method: t.paymentMethod || '振込',
+        receipt: t.receiptDelivery || '郵送'
+      })) : [{ category: '紹介料', amount: '', dueDate: '', method: '振込', receipt: '郵送' }],
+      vendor3Payments: vendor3Payments.length > 0 ? vendor3Payments.map(t => ({
+        id: t.id,
+        category: t.purpose || '紹介料',
+        amount: t.amount || '',
+        dueDate: t.dueDate || '',
+        method: t.paymentMethod || '振込',
+        receipt: t.receiptDelivery || '郵送'
+      })) : [{ category: '紹介料', amount: '', dueDate: '', method: '振込', receipt: '郵送' }],
+      buyerExpenses: buyerExpenses.length > 0 ? buyerExpenses.map(t => ({
+        id: t.id,
+        category: t.purpose || '返金',
+        amount: t.amount || '',
+        dueDate: t.dueDate || '',
+        accountImages: []
+      })) : [{ category: '返金', amount: '', dueDate: '', accountImages: [] }],
+      sellerExpenses: sellerExpenses.length > 0 ? sellerExpenses.map(t => ({
+        id: t.id,
+        category: t.purpose || '手付金',
+        amount: t.amount || '',
+        dueDate: t.dueDate || '',
+        accountImages: []
+      })) : [{ category: '手付金', amount: '', dueDate: '', accountImages: [] }],
+      vendor1Expenses: vendor1Expenses.length > 0 ? vendor1Expenses.map(t => ({
+        id: t.id,
+        category: t.purpose || '仲介手数料',
+        amount: t.amount || '',
+        dueDate: t.dueDate || '',
+        accountImages: []
+      })) : [{ category: '仲介手数料', amount: '', dueDate: '', accountImages: [] }],
+      vendor2Expenses: vendor2Expenses.length > 0 ? vendor2Expenses.map(t => ({
+        id: t.id,
+        category: t.purpose || '仲介手数料',
+        amount: t.amount || '',
+        dueDate: t.dueDate || '',
+        accountImages: []
+      })) : [{ category: '仲介手数料', amount: '', dueDate: '', accountImages: [] }],
+      vendor3Expenses: vendor3Expenses.length > 0 ? vendor3Expenses.map(t => ({
+        id: t.id,
+        category: t.purpose || '仲介手数料',
+        amount: t.amount || '',
+        dueDate: t.dueDate || '',
+        accountImages: []
+      })) : [{ category: '仲介手数料', amount: '', dueDate: '', accountImages: [] }],
+      buyerPaymentEnabled: buyerPayments.length > 0,
+      sellerPaymentEnabled: sellerPayments.length > 0,
+      vendor1PaymentEnabled: vendor1Payments.length > 0,
+      vendor2PaymentEnabled: vendor2Payments.length > 0,
+      vendor3PaymentEnabled: vendor3Payments.length > 0,
+      buyerExpenseEnabled: buyerExpenses.length > 0,
+      sellerExpenseEnabled: sellerExpenses.length > 0,
+      vendor1ExpenseEnabled: vendor1Expenses.length > 0,
+      vendor2ExpenseEnabled: vendor2Expenses.length > 0,
+      vendor3ExpenseEnabled: vendor3Expenses.length > 0
+    });
+    setShowEditContract(true);
+    setEditStep(1);
+    setEditContractTab('basic');
+  };
 
-      const [tasks, setTasks] = useState([
-        { id: 1, contractId: 1, type: '入金', title: '買主から仲介手数料入金', amount: 1500000, purpose: '仲介手数料', paymentMethod: '振込', receiptDelivery: '郵送', dueDate: '2025-11-30', status: 'pending', assigneeId: 1, priority: 'high', paymentCompleted: false },
-        { id: 2, contractId: 1, type: '抵当権抹消', title: '抵当権抹消事前手続き', dueDate: '2025-10-30', status: 'in-progress', assigneeId: 1, priority: 'high', paymentCompleted: false },
-        { id: 3, contractId: 1, type: '買主融資管理', title: '融資承認手続き', dueDate: '2025-11-09', status: 'pending', assigneeId: 1, priority: 'high', paymentCompleted: false },
-        { id: 4, contractId: 1, type: 'リフォーム管理', title: 'リフォーム手配', dueDate: '2025-10-30', status: 'pending', assigneeId: 1, priority: 'medium', paymentCompleted: false },
-        { id: 5, contractId: 1, type: '収入印紙手配', title: '買主 収入印紙手配', stampAmount: 20000, dueDate: '2025-11-28', status: 'done', assigneeId: 1, priority: 'high', party: '買主', paymentCompleted: false },
-        { id: 6, contractId: 1, type: '収入印紙手配', title: '売主 収入印紙手配', stampAmount: 20000, dueDate: '2025-11-28', status: 'pending', assigneeId: 1, priority: 'high', party: '売主', paymentCompleted: false }
-      ]);
-
-      // ==== 営業所・スタッフ管理（紐づけ対応） ====
-      const [offices, setOffices] = useState([
-        {
-          id: 1,
-          name: '渋谷営業所',
-          address: '東京都渋谷区',
-          staff: [
-            { id: 1, name: '山田花子', role: '営業担当' },
-            { id: 2, name: '鈴木一郎', role: '営業担当' }
-          ]
-        },
-        {
-          id: 2,
-          name: '新宿営業所',
-          address: '東京都新宿区',
-          staff: [
-            { id: 3, name: '田中次郎', role: '所長' },
-            { id: 4, name: '佐藤美咲', role: '経理' }
-          ]
-        }
-      ]);
-
-      const [newOffice, setNewOffice] = useState({ name: '', address: '' });
-      const [newStaff, setNewStaff] = useState({ name: '', role: '営業担当', officeId: null });
-
-      // 営業所追加
-      const addOffice = () => {
-        if (!newOffice.name.trim() || !newOffice.address.trim()) return;
-        const newId = offices.length ? Math.max(...offices.map(o => o.id)) + 1 : 1;
-        setOffices([...offices, { id: newId, ...newOffice, staff: [] }]);
-        setNewOffice({ name: '', address: '' });
-      };
-
-      // 営業所削除
-      const removeOffice = (id) => {
-        if (confirm('この営業所を削除しますか？')) {
-          setOffices(offices.filter(o => o.id !== id));
-        }
-      };
-
-      // スタッフ追加（営業所に紐づけ）
-      const addStaff = () => {
-        if (!newStaff.name.trim() || !newStaff.officeId) return;
-        const updatedOffices = offices.map(o => {
-          if (o.id === parseInt(newStaff.officeId)) {
-            const newId = o.staff.length > 0 ? Math.max(...o.staff.map(s => s.id)) + 1 : 1;
-            return { ...o, staff: [...o.staff, { id: newId, name: newStaff.name, role: newStaff.role }] };
+  const handleSaveContract = () => {
+    // マンションの場合と他の物件の場合で条件を分ける
+    const isValid = editingContract.propertyType === 'マンション'
+      ? editingContract.propertyName && editingContract.roomNumber && editingContract.buyerName && editingContract.sellerName
+      : editingContract.address && editingContract.buyerName && editingContract.sellerName;
+    
+    if (isValid) {
+      setContracts(prev => prev.map(c => 
+        c.id === editingContract.id ? {
+          ...editingContract,
+          address: editingContract.propertyType === 'マンション' ? editingContract.propertyName : editingContract.address,
+          propertyPrice: parseInt(editingContract.propertyPrice) || 0,
+          outstandingDebt: parseInt(editingContract.outstandingDebt) || 0,
+          consumptionTax: parseInt(editingContract.consumptionTax) || 0,
+          manualRevenue: parseInt(editingContract.manualRevenue) || 0,
+          officeId: parseInt(editingContract.officeId),
+          assigneeId: parseInt(editingContract.assigneeId)
+        } : c
+      ));
+      
+      // 既存の入金・支払いタスクを削除
+      const existingTaskIds = tasks
+        .filter(t => t.contractId === editingContract.id && (t.type === '入金' || t.type === '支払い'))
+        .map(t => t.id);
+      
+      setTasks(prev => prev.filter(t => !existingTaskIds.includes(t.id)));
+      
+      // 新しい入金・支払いタスクを作成
+      const newTasks = [];
+      let taskId = Math.max(...tasks.map(t => t.id), 0) + 1;
+      
+      // 買主からの入金
+      if (editingContract.buyerPaymentEnabled) {
+        editingContract.buyerPayments.forEach(payment => {
+          if (payment.amount && payment.dueDate) {
+            newTasks.push({
+              id: taskId++,
+              contractId: editingContract.id,
+              type: '入金',
+              title: `買主から${payment.category}`,
+              amount: parseInt(payment.amount),
+              purpose: payment.category,
+              paymentMethod: payment.method,
+              receiptDelivery: payment.receipt,
+              dueDate: payment.dueDate,
+              status: 'pending',
+              assigneeId: editingContract.assigneeId,
+              priority: 'high',
+              paymentCompleted: false
+            });
           }
-          return o;
         });
-        setOffices(updatedOffices);
-        setNewStaff({ name: '', role: '営業担当', officeId: null });
-      };
+      }
+      
+      // 売主からの入金
+      if (editingContract.sellerPaymentEnabled) {
+        editingContract.sellerPayments.forEach(payment => {
+          if (payment.amount && payment.dueDate) {
+            newTasks.push({
+              id: taskId++,
+              contractId: editingContract.id,
+              type: '入金',
+              title: `売主から${payment.category}`,
+              amount: parseInt(payment.amount),
+              purpose: payment.category,
+              paymentMethod: payment.method,
+              receiptDelivery: payment.receipt,
+              dueDate: payment.dueDate,
+              status: 'pending',
+              assigneeId: editingContract.assigneeId,
+              priority: 'high',
+              paymentCompleted: false
+            });
+          }
+        });
+      }
+      
+      // 業者1-3からの入金
+      [
+        { enabled: editingContract.vendor1PaymentEnabled, payments: editingContract.vendor1Payments, name: '業者1' },
+        { enabled: editingContract.vendor2PaymentEnabled, payments: editingContract.vendor2Payments, name: '業者2' },
+        { enabled: editingContract.vendor3PaymentEnabled, payments: editingContract.vendor3Payments, name: '業者3' }
+      ].forEach(vendor => {
+        if (vendor.enabled) {
+          vendor.payments.forEach(payment => {
+            if (payment.amount && payment.dueDate) {
+              newTasks.push({
+                id: taskId++,
+                contractId: editingContract.id,
+                type: '入金',
+                title: `${vendor.name}から${payment.category}`,
+                amount: parseInt(payment.amount),
+                purpose: payment.category,
+                paymentMethod: payment.method,
+                receiptDelivery: payment.receipt,
+                dueDate: payment.dueDate,
+                status: 'pending',
+                assigneeId: editingContract.assigneeId,
+                priority: 'medium',
+                paymentCompleted: false
+              });
+            }
+          });
+        }
+      });
+      
+      // 買主への支払い
+      if (editingContract.buyerExpenseEnabled) {
+        editingContract.buyerExpenses.forEach(expense => {
+          if (expense.amount && expense.dueDate) {
+            newTasks.push({
+              id: taskId++,
+              contractId: editingContract.id,
+              type: '支払い',
+              title: `買主へ${expense.category}`,
+              amount: parseInt(expense.amount),
+              purpose: expense.category,
+              dueDate: expense.dueDate,
+              status: 'pending',
+              assigneeId: editingContract.assigneeId,
+              priority: 'high',
+              paymentCompleted: false
+            });
+          }
+        });
+      }
+      
+      // 売主への支払い
+      if (editingContract.sellerExpenseEnabled) {
+        editingContract.sellerExpenses.forEach(expense => {
+          if (expense.amount && expense.dueDate) {
+            newTasks.push({
+              id: taskId++,
+              contractId: editingContract.id,
+              type: '支払い',
+              title: `売主へ${expense.category}`,
+              amount: parseInt(expense.amount),
+              purpose: expense.category,
+              dueDate: expense.dueDate,
+              status: 'pending',
+              assigneeId: editingContract.assigneeId,
+              priority: 'high',
+              paymentCompleted: false
+            });
+          }
+        });
+      }
+      
+      // 業者1-3への支払い
+      [
+        { enabled: editingContract.vendor1ExpenseEnabled, expenses: editingContract.vendor1Expenses, name: '業者1' },
+        { enabled: editingContract.vendor2ExpenseEnabled, expenses: editingContract.vendor2Expenses, name: '業者2' },
+        { enabled: editingContract.vendor3ExpenseEnabled, expenses: editingContract.vendor3Expenses, name: '業者3' }
+      ].forEach(vendor => {
+        if (vendor.enabled) {
+          vendor.expenses.forEach(expense => {
+            if (expense.amount && expense.dueDate) {
+              newTasks.push({
+                id: taskId++,
+                contractId: editingContract.id,
+                type: '支払い',
+                title: `${vendor.name}へ${expense.category}`,
+                amount: parseInt(expense.amount),
+                purpose: expense.category,
+                dueDate: expense.dueDate,
+                status: 'pending',
+                assigneeId: editingContract.assigneeId,
+                priority: 'medium',
+                paymentCompleted: false
+              });
+            }
+          });
+        }
+      });
+      
+      setTasks(prev => [...prev, ...newTasks]);
+      
+      setShowEditContract(false);
+      setEditingContract(null);
+      setEditStep(1);
+      setEditContractTab('basic');
+      alert('物件情報を更新しました');
+    }
+  };
 
-      // スタッフ削除
-      const removeStaff = (officeId
+  const handleDeleteContract = (contractId) => {
+    if (confirm('この物件を削除しますか？関連するタスクも削除されます。')) {
+      setContracts(prev => prev.filter(c => c.id !== contractId));
+      setTasks(prev => prev.filter(t => t.contractId !== contractId));
+      if (selectedContract === contractId) {
+        setSelectedContract(contracts[0]?.id || null);
+      }
+      alert('物件を削除しました');
+    }
+  };
+
+  // ステップ検証
+  const canProceedToNextStep = (step, isEdit = false) => {
+    const data = isEdit ? editingContract : newContract;
+    
+    switch(step) {
+      case 1:
+        if (data.propertyType === 'マンション') {
+          return data.propertyName && data.roomNumber && data.dealType;
+        }
+        return data.address && data.dealType;
+      case 2:
+        return data.buyerName && data.sellerName;
+      case 3:
+        // 買取再販の場合は手打ち売上が必須
+        if (data.dealType === '買取再販') {
+          return data.manualRevenue;
+        }
+        return data.propertyPrice && data.outstandingDebt;
+      case 4:
+        return data.contractDate && data.settlementDeadline;
+      case 5:
+        return data.officeId && data.assigneeId;
+      case 6:
+        return true; // オプション設定は常にOK
+      case 7:
+        // 入金・支払い管理：有効化したものは必須項目チェック
+        if (data.buyerPaymentEnabled && !data.buyerPaymentSplit) {
+          const valid = data.buyerPayments.every(p => p.category && p.amount && p.dueDate);
+          if (!valid) return false;
+        }
+        if (data.sellerPaymentEnabled && !data.sellerPaymentSplit) {
+          const valid = data.sellerPayments.every(p => p.category && p.amount && p.dueDate);
+          if (!valid) return false;
+        }
+        if (data.vendor1PaymentEnabled) {
+          const valid = data.vendor1Payments.every(p => p.category && p.amount && p.dueDate);
+          if (!valid) return false;
+        }
+        if (data.vendor2PaymentEnabled) {
+          const valid = data.vendor2Payments.every(p => p.category && p.amount && p.dueDate);
+          if (!valid) return false;
+        }
+        if (data.vendor3PaymentEnabled) {
+          const valid = data.vendor3Payments.every(p => p.category && p.amount && p.dueDate);
+          if (!valid) return false;
+        }
+        if (data.buyerExpenseEnabled) {
+          const valid = data.buyerExpenses.every(p => p.category && p.amount && p.dueDate);
+          if (!valid) return false;
+        }
+        if (data.sellerExpenseEnabled) {
+          const valid = data.sellerExpenses.every(p => p.category && p.amount && p.dueDate);
+          if (!valid) return false;
+        }
+        if (data.vendor1ExpenseEnabled) {
+          const valid = data.vendor1Expenses.every(p => p.category && p.amount && p.dueDate);
+          if (!valid) return false;
+        }
+        if (data.vendor2ExpenseEnabled) {
+          const valid = data.vendor2Expenses.every(p => p.category && p.amount && p.dueDate);
+          if (!valid) return false;
+        }
+        if (data.vendor3ExpenseEnabled) {
+          const valid = data.vendor3Expenses.every(p => p.category && p.amount && p.dueDate);
+          if (!valid) return false;
+        }
+        return true;
+      default:
+        return false;
+    }
+  };
+
+  const handleAddOffice = () => {
+    if (newOffice.name && newOffice.address) {
+      const office = { id: offices.length + 1, name: newOffice.name, address: newOffice.address };
+      setOffices([...offices, office]);
+      setNewOffice({ name: '', address: '' });
+      setShowAddOffice(false);
+    }
+  };
+
+  const handleAddStaff = () => {
+    if (newStaff.name && newStaff.officeId) {
+      const staffMember = {
+        id: staff.length + 1, name: newStaff.name,
+        officeId: parseInt(newStaff.officeId), role: newStaff.role, email: newStaff.email
+      };
+      setStaff([...staff, staffMember]);
+      setNewStaff({ name: '', officeId: '', role: '営業担当', email: '' });
+      setShowAddStaff(false);
+    }
+  };
+
+  const getTaskIcon = (type) => {
+    switch(type) {
+      case '入金': return DollarSign;
+      case '支払い': return DollarSign;
+      case '契約書管理': return FileText;
+      case '収入印紙手配': return FileText;
+      default: return AlertCircle;
+    }
+  };
+
+  const getPriorityColor = (priority) => {
+    switch(priority) {
+      case 'high': return 'bg-red-100 text-red-700 border-red-300';
+      case 'medium': return 'bg-yellow-100 text-yellow-700 border-yellow-300';
+      default: return 'bg-gray-100 text-gray-700 border-gray-300';
+    }
+  };
+
+  const selectedContractData = contracts.find(c => c.id === selectedContract);
+  const tasksByStatus = {
+    pending: filteredTasks.filter(t => t.status === 'pending'),
+    'in-progress': filteredTasks.filter(t => t.status === 'in-progress'),
+    done: filteredTasks.filter(t => t.status === 'done')
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Building2 className="w-8 h-8 text-blue-600" />
+              <h1 className="text-2xl font-bold text-gray-800">不動産契約進捗管理</h1>
+            </div>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setView('dashboard')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${
+                  view === 'dashboard' ? 'bg-indigo-500 text-white' : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                <LayoutDashboard className="w-5 h-5" />
+                <span>ダッシュボード</span>
+              </button>
+              <button
+                onClick={() => setView('contracts')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  view === 'contracts' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                契約管理
+              </button>
+              <button
+                onClick={() => setView('accounting')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  view === 'accounting' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                経理管理
+              </button>
+              <button
+                onClick={() => setView('sales')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  view === 'sales' ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                売上管理
+              </button>
+              <button
+                onClick={() => setView('office')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  view === 'office' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                <Users className="w-5 h-5 inline mr-1" />
+                営業所管理
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {view === 'dashboard' ? (
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="mb-6">
+            <h2 className="text-3xl font-bold text-gray-800 mb-2">ダッシュボード</h2>
+            <p className="text-gray-600">業務全体の概要と統計情報</p>
+          </div>
+
+          <div className="grid grid-cols-4 gap-6 mb-6">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
+              <div className="flex items-center justify-between mb-4">
+                <Building2 className="w-10 h-10 opacity-80" />
+                <div className="text-3xl font-bold">{dashboardStats.totalContracts}</div>
+              </div>
+              <div className="text-sm opacity-90">総契約数</div>
+              <div className="text-xs opacity-75 mt-1">進行中: {dashboardStats.activeContracts}件</div>
+            </div>
+
+            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white">
+              <div className="flex items-center justify-between mb-4">
+                <Check className="w-10 h-10 opacity-80" />
+                <div className="text-3xl font-bold">{dashboardStats.completedTasks}</div>
+              </div>
+              <div className="text-sm opacity-90">完了タスク</div>
+              <div className="text-xs opacity-75 mt-1">完了率: {dashboardStats.completionRate}%</div>
+            </div>
+
+            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg p-6 text-white">
+              <div className="flex items-center justify-between mb-4">
+                <Clock className="w-10 h-10 opacity-80" />
+                <div className="text-3xl font-bold">{dashboardStats.inProgressTasks}</div>
+              </div>
+              <div className="text-sm opacity-90">進行中タスク</div>
+              <div className="text-xs opacity-75 mt-1">未着手: {dashboardStats.pendingTasks}件</div>
+            </div>
+
+            <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-lg p-6 text-white">
+              <div className="flex items-center justify-between mb-4">
+                <AlertCircle className="w-10 h-10 opacity-80" />
+                <div className="text-3xl font-bold">{dashboardStats.highPriorityTasks}</div>
+              </div>
+              <div className="text-sm opacity-90">高優先度タスク</div>
+              <div className="text-xs opacity-75 mt-1">本日期限: {dashboardStats.todayTasks}件</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-6 mb-6">
+            <div className="col-span-2 bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <PieChart className="w-6 h-6 mr-2 text-blue-600" />
+                タスク進捗状況
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-gray-700">未着手</span>
+                    <span className="text-sm font-bold text-gray-800">{dashboardStats.pendingTasks}件</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div 
+                      className="bg-gray-500 h-3 rounded-full"
+                      style={{ width: `${(dashboardStats.pendingTasks / dashboardStats.totalTasks) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-gray-700">進行中</span>
+                    <span className="text-sm font-bold text-gray-800">{dashboardStats.inProgressTasks}件</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div 
+                      className="bg-blue-500 h-3 rounded-full"
+                      style={{ width: `${(dashboardStats.inProgressTasks / dashboardStats.totalTasks) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-gray-700">完了</span>
+                    <span className="text-sm font-bold text-gray-800">{dashboardStats.completedTasks}件</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div 
+                      className="bg-green-500 h-3 rounded-full"
+                      style={{ width: `${(dashboardStats.completedTasks / dashboardStats.totalTasks) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <TrendingUp className="w-6 h-6 mr-2 text-purple-600" />
+                売上サマリー
+              </h3>
+              <div className="space-y-4">
+                <div className="border-b border-gray-200 pb-4">
+                  <div className="text-sm text-gray-600 mb-1">総売上見込</div>
+                  <div className="text-2xl font-bold text-purple-600">
+                    ¥{Math.round(dashboardStats.totalRevenue).toLocaleString()}
+                  </div>
+                </div>
+                <div className="border-b border-gray-200 pb-4">
+                  <div className="text-sm text-gray-600 mb-1">契約単価平均</div>
+                  <div className="text-xl font-bold text-gray-800">
+                    ¥{Math.round(dashboardStats.totalRevenue / dashboardStats.totalContracts).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-600 mb-1">営業所数</div>
+                  <div className="text-xl font-bold text-gray-800">{offices.length}拠点</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">本日期限のタスク</h3>
+              <div className="space-y-3">
+                {tasks.filter(t => isToday(t.dueDate) && t.status !== 'done').length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">本日期限のタスクはありません</div>
+                ) : (
+                  tasks.filter(t => isToday(t.dueDate) && t.status !== 'done').map(task => (
+                    <div key={task.id} className="border-l-4 border-red-500 bg-red-50 p-4 rounded">
+                      <div className="font-semibold text-gray-800">{task.title}</div>
+                      <div className="text-sm text-gray-600 mt-1">{task.type}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">高優先度タスク</h3>
+              <div className="space-y-3">
+                {tasks.filter(t => t.priority === 'high' && t.status !== 'done').slice(0, 5).map(task => (
+                  <div key={task.id} className="border-l-4 border-orange-500 bg-orange-50 p-4 rounded">
+                    <div className="font-semibold text-gray-800">{task.title}</div>
+                    <div className="text-sm text-gray-600 mt-1">期日: {task.dueDate}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : view === 'contracts' ? (
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="grid grid-cols-12 gap-6">
+            <div className="col-span-3">
+              <div className="bg-white rounded-xl shadow-lg p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-bold text-gray-800">物件一覧</h2>
+                  <button
+                    onClick={() => setShowNewContract(true)}
+                    className="p-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+                
+                {/* 営業所フィルター */}
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold text-gray-700 mb-2">営業所で絞り込み</label>
+                  <select
+                    value={officeFilter}
+                    onChange={(e) => setOfficeFilter(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">すべての営業所</option>
+                    {offices.map(office => (
+                      <option key={office.id} value={office.id}>{office.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="text-xs text-gray-500 mb-2">
+                  {filteredContracts.length}件の物件
+                </div>
+
+                <div className="space-y-2">
+                  {filteredContracts.map(contract => (
+                    <div
+                      key={contract.id}
+                      className={`p-4 rounded-lg transition-all relative group ${
+                        selectedContract === contract.id
+                          ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
+                          : 'bg-gray-50 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div 
+                        onClick={() => setSelectedContract(contract.id)}
+                        className="cursor-pointer"
+                      >
+                        <div className="font-semibold text-sm mb-1">{contract.propertyType}</div>
+                        {contract.propertyType === 'マンション' ? (
+                          <div className="text-xs opacity-80 mb-2">
+                            {contract.propertyName} {contract.roomNumber && `- ${contract.roomNumber}`}
+                          </div>
+                        ) : (
+                          <div className="text-xs opacity-80 mb-2">{contract.address}</div>
+                        )}
+                        <div className="flex items-center justify-between text-xs mb-2">
+                          <span className={`px-2 py-1 rounded ${
+                            selectedContract === contract.id 
+                              ? 'bg-white bg-opacity-20' 
+                              : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {contract.dealType}
+                          </span>
+                          <span>{contract.progress}%</span>
+                        </div>
+                        <div className="text-xs opacity-75">買主: {contract.buyerName}</div>
+                        <div className="text-xs opacity-60 mt-1">{getOfficeName(contract.officeId)}</div>
+                      </div>
+                      
+                      <div className={`absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ${
+                        selectedContract === contract.id ? 'opacity-100' : ''
+                      }`}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditContractOpen(contract);
+                          }}
+                          className={`p-1.5 rounded ${
+                            selectedContract === contract.id 
+                              ? 'bg-white bg-opacity-20 hover:bg-opacity-30' 
+                              : 'bg-blue-500 hover:bg-blue-600'
+                          } text-white transition-colors`}
+                          title="編集"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteContract(contract.id);
+                          }}
+                          className={`p-1.5 rounded ${
+                            selectedContract === contract.id 
+                              ? 'bg-white bg-opacity-20 hover:bg-opacity-30' 
+                              : 'bg-red-500 hover:bg-red-600'
+                          } text-white transition-colors`}
+                          title="削除"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {filteredContracts.length === 0 && (
+                    <div className="text-center py-8 text-gray-500 text-sm">
+                      該当する物件がありません
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="col-span-9">
+              <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl shadow-lg p-6 mb-6 text-white">
+                <h2 className="text-2xl font-bold mb-2">{selectedContractData.propertyType} - {selectedContractData.address}</h2>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm opacity-90 mb-4">
+                  <span>買主: {selectedContractData.buyerName}</span>
+                  <span>売主: {selectedContractData.sellerName}</span>
+                  <span>物件金額: ¥{selectedContractData.propertyPrice.toLocaleString()}</span>
+                  <span>契約日: {selectedContractData.contractDate}</span>
+                </div>
+                <div className="mt-4">
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span>全体進捗</span>
+                    <span className="font-bold">{selectedContractData.progress}%</span>
+                  </div>
+                  <div className="w-full bg-white bg-opacity-20 rounded-full h-3">
+                    <div 
+                      className="bg-white h-3 rounded-full transition-all duration-500"
+                      style={{ width: `${selectedContractData.progress}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 検索・エクスポートセクション */}
+              <div className="bg-white rounded-xl shadow-lg p-4 mb-6">
+                <div className="flex items-center space-x-4">
+                  <div className="flex-1 relative">
+                    <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="タスクを検索..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <button
+                    onClick={handleExportTasks}
+                    className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2"
+                  >
+                    <Download className="w-5 h-5" />
+                    <span>CSV出力</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                {[
+                  { key: 'pending', title: '未着手', color: 'bg-gray-100', icon: AlertCircle },
+                  { key: 'in-progress', title: '進行中', color: 'bg-blue-100', icon: Clock },
+                  { key: 'done', title: '完了', color: 'bg-green-100', icon: Check }
+                ].map(column => {
+                  const Icon = column.icon;
+                  return (
+                    <div key={column.key} className={`${column.color} rounded-xl p-4 min-h-96`}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-gray-800 flex items-center">
+                          <Icon className="w-5 h-5 mr-2" />
+                          {column.title}
+                        </h3>
+                        <span className="bg-white px-2 py-1 rounded-full text-xs font-bold text-gray-600">
+                          {tasksByStatus[column.key].length}
+                        </span>
+                      </div>
+                      <div className="space-y-3">
+                        {tasksByStatus[column.key].map(task => {
+                          const TaskIcon = getTaskIcon(task.type);
+                          return (
+                            <div
+                              key={task.id}
+                              onClick={() => setShowTaskDetail(task)}
+                              className="bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                            >
+                              <div className="flex items-start justify-between mb-2">
+                                <div className="flex items-center space-x-2 flex-1">
+                                  <TaskIcon className="w-4 h-4 text-blue-600" />
+                                  <h4 className="font-semibold text-sm text-gray-800">{task.title}</h4>
+                                </div>
+                                <span className={`text-xs px-2 py-1 rounded-full border ${getPriorityColor(task.priority)}`}>
+                                  {task.priority === 'high' ? '高' : '中'}
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-500 mb-2">{task.type}</div>
+                              <div className="flex items-center justify-between text-xs text-gray-600">
+                                <span className="flex items-center">
+                                  <Calendar className="w-3 h-3 mr-1" />
+                                  {task.dueDate}
+                                </span>
+                                {task.amount && (
+                                  <span className="font-semibold text-green-600">¥{task.amount.toLocaleString()}</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : view === 'accounting' ? (
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-800">経理管理</h2>
+            <button
+              onClick={handleExportTasks}
+              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2"
+            >
+              <Download className="w-5 h-5" />
+              <span>経理データをCSV出力</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6 mb-6">
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <DollarSign className="w-6 h-6 mr-2 text-green-600" />
+                入金予定（本日）
+              </h2>
+              {tasks.filter(t => t.type === '入金' && isToday(t.dueDate)).length === 0 ? (
+                <div className="text-sm text-gray-500 text-center py-8">本日の入金予定はありません</div>
+              ) : (
+                <div className="space-y-3">
+                  {tasks.filter(t => t.type === '入金' && isToday(t.dueDate)).map(task => {
+                    const contract = contracts.find(c => c.id === task.contractId);
+                    return (
+                      <div 
+                        key={task.id} 
+                        onClick={() => setShowPaymentDetail(task)}
+                        className={`border-l-4 ${task.paymentCompleted ? 'border-gray-400 bg-gray-100' : 'border-green-500 bg-green-50'} p-4 rounded cursor-pointer hover:shadow-md transition-all relative`}
+                      >
+                        {task.paymentCompleted && (
+                          <div className="absolute top-2 right-2">
+                            <Check className="w-5 h-5 text-green-600" />
+                          </div>
+                        )}
+                        <div className={`font-semibold ${task.paymentCompleted ? 'text-gray-500 line-through' : 'text-gray-800'}`}>
+                          {task.title}
+                        </div>
+                        <div className="text-sm text-gray-600 mt-1">金額: ¥{task.amount?.toLocaleString()}</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          物件: {contract?.propertyType}
+                          {task.paymentCompleted && <span className="ml-2 text-green-600 font-semibold">✓ 入金完了</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <DollarSign className="w-6 h-6 mr-2 text-red-600" />
+                支払予定（本日）
+              </h2>
+              {tasks.filter(t => t.type === '支払い' && isToday(t.dueDate)).length === 0 ? (
+                <div className="text-sm text-gray-500 text-center py-8">本日の支払予定はありません</div>
+              ) : (
+                <div className="space-y-3">
+                  {tasks.filter(t => t.type === '支払い' && isToday(t.dueDate)).map(task => {
+                    const contract = contracts.find(c => c.id === task.contractId);
+                    return (
+                      <div 
+                        key={task.id}
+                        onClick={() => setShowPaymentDetail(task)}
+                        className={`border-l-4 ${task.paymentCompleted ? 'border-gray-400 bg-gray-100' : 'border-red-500 bg-red-50'} p-4 rounded cursor-pointer hover:shadow-md transition-all relative`}
+                      >
+                        {task.paymentCompleted && (
+                          <div className="absolute top-2 right-2">
+                            <Check className="w-5 h-5 text-green-600" />
+                          </div>
+                        )}
+                        <div className={`font-semibold ${task.paymentCompleted ? 'text-gray-500 line-through' : 'text-gray-800'}`}>
+                          {task.title}
+                        </div>
+                        <div className="text-sm text-gray-600 mt-1">金額: ¥{task.amount?.toLocaleString()}</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          物件: {contract?.propertyType}
+                          {task.paymentCompleted && <span className="ml-2 text-green-600 font-semibold">✓ 支払完了</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">入金予定（7日後まで）</h2>
+              {tasks.filter(t => t.type === '入金').length === 0 ? (
+                <div className="text-sm text-gray-500 text-center py-8">入金予定はありません</div>
+              ) : (
+                <div className="space-y-3">
+                  {tasks.filter(t => t.type === '入金').map(task => {
+                    const contract = contracts.find(c => c.id === task.contractId);
+                    return (
+                      <div 
+                        key={task.id}
+                        onClick={() => setShowPaymentDetail(task)}
+                        className="border-l-4 border-green-500 bg-green-50 p-4 rounded cursor-pointer hover:bg-green-100 transition-colors"
+                      >
+                        <div className="font-semibold text-gray-800">{task.title}</div>
+                        <div className="text-sm text-gray-600 mt-1">金額: ¥{task.amount?.toLocaleString()}</div>
+                        <div className="text-xs text-gray-500 mt-1">期日: {task.dueDate}</div>
+                        <div className="text-xs text-gray-500">物件: {contract?.propertyType}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">支払予定（7日後まで）</h2>
+              {tasks.filter(t => t.type === '支払い').length === 0 ? (
+                <div className="text-sm text-gray-500 text-center py-8">該当する支払予定はありません</div>
+              ) : (
+                <div className="space-y-3">
+                  {tasks.filter(t => t.type === '支払い').map(task => {
+                    const contract = contracts.find(c => c.id === task.contractId);
+                    return (
+                      <div 
+                        key={task.id}
+                        onClick={() => setShowPaymentDetail(task)}
+                        className="border-l-4 border-red-500 bg-red-50 p-4 rounded cursor-pointer hover:bg-red-100 transition-colors"
+                      >
+                        <div className="font-semibold text-gray-800">{task.title}</div>
+                        <div className="text-sm text-gray-600 mt-1">金額: ¥{task.amount?.toLocaleString()}</div>
+                        <div className="text-xs text-gray-500 mt-1">期日: {task.dueDate}</div>
+                        <div className="text-xs text-gray-500">物件: {contract?.propertyType}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : view === 'sales' ? (
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-800">売上管理</h2>
+            <button
+              onClick={handleExportContracts}
+              className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center space-x-2"
+            >
+              <Download className="w-5 h-5" />
+              <span>売上データをCSV出力</span>
+            </button>
+          </div>
+
+          {/* 期間選択コントロール */}
+          <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <h3 className="text-lg font-bold text-gray-800">表示期間</h3>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setSalesPeriodType('month')}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                      salesPeriodType === 'month'
+                        ? 'bg-purple-500 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    月初～月末
+                  </button>
+                  <button
+                    onClick={() => setSalesPeriodType('21st')}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                      salesPeriodType === '21st'
+                        ? 'bg-purple-500 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    21日～20日
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => {
+                    if (salesMonth === 1) {
+                      setSalesYear(salesYear - 1);
+                      setSalesMonth(12);
+                    } else {
+                      setSalesMonth(salesMonth - 1);
+                    }
+                  }}
+                  className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  <ChevronRight className="w-5 h-5 transform rotate-180" />
+                </button>
+
+                <div className="text-center min-w-40">
+                  <div className="text-2xl font-bold text-gray-800">
+                    {salesYear}年 {salesMonth}月
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {salesPeriodType === 'month' 
+                      ? `${salesMonth}/1 ～ ${salesMonth}/${new Date(salesYear, salesMonth, 0).getDate()}`
+                      : `${salesMonth - 1}/21 ～ ${salesMonth}/20`
+                    }
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (salesMonth === 12) {
+                      setSalesYear(salesYear + 1);
+                      setSalesMonth(1);
+                    } else {
+                      setSalesMonth(salesMonth + 1);
+                    }
+                  }}
+                  className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+
+                <button
+                  onClick={() => {
+                    setSalesYear(2025);
+                    setSalesMonth(10);
+                  }}
+                  className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors font-semibold"
+                >
+                  今月
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 全体売上サマリー */}
+          <div className="grid grid-cols-3 gap-6 mb-6">
+            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white">
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-sm opacity-90">入金済み分</div>
+                <Check className="w-8 h-8 opacity-80" />
+              </div>
+              <div className="text-3xl font-bold mb-2">¥{salesStats.totalCompleted.toLocaleString()}</div>
+              <div className="text-xs opacity-75">実際に入金された金額</div>
+            </div>
+
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-sm opacity-90">入金予定分</div>
+                <Clock className="w-8 h-8 opacity-80" />
+              </div>
+              <div className="text-3xl font-bold mb-2">¥{salesStats.totalPending.toLocaleString()}</div>
+              <div className="text-xs opacity-75">未入金の予定金額</div>
+            </div>
+
+            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-sm opacity-90">入金済み+予定分 合計</div>
+                <TrendingUp className="w-8 h-8 opacity-80" />
+              </div>
+              <div className="text-3xl font-bold mb-2">¥{salesStats.total.toLocaleString()}</div>
+              <div className="text-xs opacity-75">総売上見込</div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+              <TrendingUp className="w-7 h-7 mr-3 text-purple-600" />
+              営業所別売上表示
+            </h2>
+            <div className="grid grid-cols-3 gap-6">
+              {offices.map(office => {
+                const stats = salesStats.byOffice[office.id] || { completed: 0, pending: 0, total: 0 };
+                return (
+                  <div key={office.id} className="border-2 border-purple-200 rounded-xl p-5">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4">{office.name}</h3>
+                    <div className="space-y-3">
+                      <div className="bg-green-50 p-3 rounded-lg">
+                        <div className="text-xs text-gray-600 mb-1">入金済み分</div>
+                        <div className="text-2xl font-bold text-green-600">¥{stats.completed.toLocaleString()}</div>
+                      </div>
+                      <div className="bg-blue-50 p-3 rounded-lg">
+                        <div className="text-xs text-gray-600 mb-1">入金予定分</div>
+                        <div className="text-2xl font-bold text-blue-600">¥{stats.pending.toLocaleString()}</div>
+                      </div>
+                      <div className="bg-purple-50 p-3 rounded-lg border-2 border-purple-300">
+                        <div className="text-xs text-gray-600 mb-1">合計</div>
+                        <div className="text-2xl font-bold text-purple-600">¥{stats.total.toLocaleString()}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-6">営業別売上（渋谷営業所）</h2>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-4">
+                {staff.filter(s => s.officeId === 1 && s.role === '営業担当').map(s => {
+                  // 期間内のこの担当者の入金タスクを計算
+                  const startDateStr = salesStats.periodStart.toISOString().split('T')[0];
+                  const endDateStr = salesStats.periodEnd.toISOString().split('T')[0];
+                  
+                  const staffTasks = tasks.filter(t => {
+                    const contract = contracts.find(c => c.id === t.contractId);
+                    return contract && contract.assigneeId === s.id && t.type === '入金' && t.amount &&
+                           t.dueDate >= startDateStr && t.dueDate <= endDateStr;
+                  });
+                  
+                  const completed = staffTasks.filter(t => t.paymentCompleted).reduce((sum, t) => sum + (t.amount || 0), 0);
+                  const pending = staffTasks.filter(t => !t.paymentCompleted).reduce((sum, t) => sum + (t.amount || 0), 0);
+                  
+                  return (
+                    <div key={s.id} className="border border-gray-200 rounded-lg p-4">
+                      <div className="font-semibold text-gray-800 mb-3">{s.name}</div>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="bg-green-50 p-2 rounded">
+                          <div className="text-gray-600 text-xs">入金済み</div>
+                          <div className="font-bold text-gray-800">¥{completed.toLocaleString()}</div>
+                        </div>
+                        <div className="bg-blue-50 p-2 rounded">
+                          <div className="text-gray-600 text-xs">予定分</div>
+                          <div className="font-bold text-gray-800">¥{pending.toLocaleString()}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="bg-gray-50 rounded-lg p-6 flex items-center justify-center">
+                <div className="text-center">
+                  <BarChart3 className="w-32 h-32 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">グラフ表示エリア</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : view === 'office' ? (
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+                <MapPin className="w-7 h-7 mr-3 text-orange-600" />
+                営業所・スタッフ管理
+              </h2>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowAddStaff(true)}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 transition-colors flex items-center space-x-2"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span>スタッフ追加</span>
+                </button>
+                <button
+                  onClick={() => setShowAddOffice(true)}
+                  className="px-4 py-2 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-colors flex items-center space-x-2"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span>営業所追加</span>
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {offices.map(office => (
+                <div key={office.id} className="border-2 border-orange-200 rounded-xl p-5 hover:border-orange-400 transition-all">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-gray-800">{office.name}</h3>
+                    <div className="flex items-center space-x-2">
+                      <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm font-semibold">
+                        {getOfficeStaff(office.id).length}名
+                      </span>
+                      <button
+                        onClick={() => handleDeleteOffice(office.id)}
+                        className="p-1 text-red-500 hover:bg-red-50 rounded"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-gray-600 text-sm mb-4 flex items-center">
+                    <MapPin className="w-4 h-4 mr-1" />
+                    {office.address}
+                  </p>
+                  <div className="border-t border-gray-200 pt-4">
+                    <h4 className="font-semibold text-gray-700 mb-3 text-sm">所属スタッフ</h4>
+                    <div className="space-y-2">
+                      {getOfficeStaff(office.id).map(s => (
+                        <div key={s.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-400 rounded-full flex items-center justify-center text-white font-bold">
+                              {s.name[0]}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-sm text-gray-800">{s.name}</div>
+                              <div className="text-xs text-gray-500">{s.role}</div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteStaff(s.id)}
+                            className="p-1 text-red-500 hover:bg-red-100 rounded"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="text-sm text-gray-600">
+                      担当物件: {contracts.filter(c => c.officeId === office.id).length}件
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* 新規契約モーダル - ステップ形式 */}
+      {showNewContract && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col relative z-[101]">
+            <div className="bg-white border-b border-gray-200 p-6 rounded-t-2xl flex-shrink-0">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-2xl font-bold text-gray-800">新規物件登録</h3>
+                <button 
+                  onClick={() => {
+                    setShowNewContract(false);
+                    setCurrentStep(1);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              {/* ステップインジケーター */}
+              <div className="flex items-center justify-between">
+                {[1, 2, 3, 4, 5, 6, 7].map((step) => (
+                  <div key={step} className="flex items-center flex-1">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${
+                      currentStep === step 
+                        ? 'bg-blue-500 text-white scale-110' 
+                        : currentStep > step 
+                        ? 'bg-green-500 text-white' 
+                        : 'bg-gray-200 text-gray-500'
+                    }`}>
+                      {currentStep > step ? <Check className="w-5 h-5" /> : step}
+                    </div>
+                    {step < 7 && (
+                      <div className={`flex-1 h-1 mx-2 transition-all ${
+                        currentStep > step ? 'bg-green-500' : 'bg-gray-200'
+                      }`}></div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              
+              <div className="mt-4 text-center">
+                <p className="text-sm font-semibold text-gray-700">
+                  {currentStep === 1 && '物件基本情報'}
+                  {currentStep === 2 && '当事者情報'}
+                  {currentStep === 3 && '金額情報'}
+                  {currentStep === 4 && '日程情報'}
+                  {currentStep === 5 && '担当情報'}
+                  {currentStep === 6 && 'オプション設定'}
+                  {currentStep === 7 && '入金・支払い管理'}
+                </p>
+              </div>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1">
+              {/* ステップ1: 物件基本情報 */}
+              {currentStep === 1 && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">物件種別 *</label>
+                    <select
+                      value={newContract.propertyType}
+                      onChange={(e) => setNewContract({ ...newContract, propertyType: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      {propertyTypes.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">取引種別 *</label>
+                    <select
+                      value={newContract.dealType}
+                      onChange={(e) => setNewContract({ ...newContract, dealType: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      {dealTypes.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {newContract.propertyType === 'マンション' ? (
+                    <>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">物件名 *</label>
+                        <input
+                          type="text"
+                          value={newContract.propertyName}
+                          onChange={(e) => setNewContract({ ...newContract, propertyName: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          placeholder="例: パークマンション渋谷"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">号室 *</label>
+                        <input
+                          type="text"
+                          value={newContract.roomNumber}
+                          onChange={(e) => setNewContract({ ...newContract, roomNumber: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          placeholder="例: 305"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">物件住所 *</label>
+                      <input
+                        type="text"
+                        value={newContract.address}
+                        onChange={(e) => setNewContract({ ...newContract, address: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="例: 東京都渋谷区神宮前1-1-1"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ステップ2: 当事者情報 */}
+              {currentStep === 2 && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">買主名前 *</label>
+                    <input
+                      type="text"
+                      value={newContract.buyerName}
+                      onChange={(e) => setNewContract({ ...newContract, buyerName: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="例: 田中太郎"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">買主フリガナ</label>
+                    <input
+                      type="text"
+                      value={newContract.buyerKana}
+                      onChange={(e) => setNewContract({ ...newContract, buyerKana: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="例: タナカタロウ"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">売主名前 *</label>
+                    <input
+                      type="text"
+                      value={newContract.sellerName}
+                      onChange={(e) => setNewContract({ ...newContract, sellerName: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="例: 山田次郎"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">売主フリガナ</label>
+                    <input
+                      type="text"
+                      value={newContract.sellerKana}
+                      onChange={(e) => setNewContract({ ...newContract, sellerKana: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="例: ヤマダジロウ"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ステップ3: 金額情報 */}
+              {currentStep === 3 && (
+                <div className="space-y-4">
+                  {newContract.dealType === '買取再販' ? (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">売上金額（手入力） *</label>
+                      <input
+                        type="number"
+                        value={newContract.manualRevenue}
+                        onChange={(e) => setNewContract({ ...newContract, manualRevenue: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="例: 5000000"
+                      />
+                      <p className="text-xs text-gray-500 mt-2">※ 買取再販の場合は売上金額を直接入力してください</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">物件金額 *</label>
+                        <input
+                          type="number"
+                          value={newContract.propertyPrice}
+                          onChange={(e) => setNewContract({ ...newContract, propertyPrice: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          placeholder="例: 50000000"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">物件残債 *</label>
+                        <input
+                          type="number"
+                          value={newContract.outstandingDebt}
+                          onChange={(e) => setNewContract({ ...newContract, outstandingDebt: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          placeholder="例: 30000000"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">消費税</label>
+                        <input
+                          type="number"
+                          value={newContract.consumptionTax}
+                          onChange={(e) => setNewContract({ ...newContract, consumptionTax: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          placeholder="例: 0"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ステップ4: 日程情報 */}
+              {currentStep === 4 && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">契約日 *</label>
+                    <input
+                      type="date"
+                      value={newContract.contractDate}
+                      onChange={(e) => setNewContract({ ...newContract, contractDate: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">決済期日 *</label>
+                    <input
+                      type="date"
+                      value={newContract.settlementDeadline}
+                      onChange={(e) => setNewContract({ ...newContract, settlementDeadline: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">確定決済日</label>
+                    <input
+                      type="date"
+                      value={newContract.confirmedSettlementDate}
+                      onChange={(e) => setNewContract({ ...newContract, confirmedSettlementDate: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ステップ5: 担当情報 */}
+              {currentStep === 5 && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">営業所 *</label>
+                    <select
+                      value={newContract.officeId}
+                      onChange={(e) => setNewContract({ ...newContract, officeId: e.target.value, assigneeId: '' })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">選択してください</option>
+                      {offices.map(office => (
+                        <option key={office.id} value={office.id}>{office.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">担当者 *</label>
+                    <select
+                      value={newContract.assigneeId}
+                      onChange={(e) => setNewContract({ ...newContract, assigneeId: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      disabled={!newContract.officeId}
+                    >
+                      <option value="">選択してください</option>
+                      {newContract.officeId && getOfficeStaff(parseInt(newContract.officeId)).map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* ステップ6: オプション設定 */}
+              {currentStep === 6 && (
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-gray-800 mb-3">オプション設定</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={newContract.loanUsage}
+                        onChange={(e) => setNewContract({ ...newContract, loanUsage: e.target.checked })}
+                        className="w-5 h-5 text-blue-600"
+                      />
+                      <span className="text-sm font-medium">買主ローン使用</span>
+                    </label>
+                    <label className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={newContract.mortgageRemoval}
+                        onChange={(e) => setNewContract({ ...newContract, mortgageRemoval: e.target.checked })}
+                        className="w-5 h-5 text-blue-600"
+                      />
+                      <span className="text-sm font-medium">抵当権抹消</span>
+                    </label>
+                    <label className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={newContract.renovation}
+                        onChange={(e) => setNewContract({ ...newContract, renovation: e.target.checked })}
+                        className="w-5 h-5 text-blue-600"
+                      />
+                      <span className="text-sm font-medium">リフォーム</span>
+                    </label>
+                    <label className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={newContract.demolition}
+                        onChange={(e) => setNewContract({ ...newContract, demolition: e.target.checked })}
+                        className="w-5 h-5 text-blue-600"
+                      />
+                      <span className="text-sm font-medium">解体</span>
+                    </label>
+                    <label className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={newContract.survey}
+                        onChange={(e) => setNewContract({ ...newContract, survey: e.target.checked })}
+                        className="w-5 h-5 text-blue-600"
+                      />
+                      <span className="text-sm font-medium">測量</span>
+                    </label>
+                    <label className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={newContract.arrears}
+                        onChange={(e) => setNewContract({ ...newContract, arrears: e.target.checked })}
+                        className="w-5 h-5 text-blue-600"
+                      />
+                      <span className="text-sm font-medium">滞納あり</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* ステップ7: 入金・支払い管理 */}
+              {currentStep === 7 && (
+                <div className="space-y-6 max-h-96 overflow-y-auto">
+                  <p className="text-sm text-gray-600 mb-4">※ 各項目で「あり」にチェックすると詳細入力が必須になります</p>
+                  
+                  {/* 買主からの入金 */}
+                  <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <input
+                        type="checkbox"
+                        checked={newContract.buyerPaymentEnabled}
+                        onChange={(e) => setNewContract({ ...newContract, buyerPaymentEnabled: e.target.checked })}
+                        className="w-5 h-5 text-blue-600"
+                      />
+                      <label className="font-semibold text-gray-800">買主からの入金分</label>
+                      {newContract.buyerPaymentEnabled && (
+                        <label className="flex items-center space-x-2 ml-auto">
+                          <input
+                            type="checkbox"
+                            checked={newContract.buyerPaymentSplit}
+                            onChange={(e) => setNewContract({ ...newContract, buyerPaymentSplit: e.target.checked })}
+                            className="w-4 h-4 text-gray-600"
+                          />
+                          <span className="text-sm text-gray-600">分かれ</span>
+                        </label>
+                      )}
+                    </div>
+                    {newContract.buyerPaymentEnabled && !newContract.buyerPaymentSplit && (
+                      <div className="space-y-3 mt-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <select
+                            value={newContract.buyerPayments[0].category}
+                            onChange={(e) => {
+                              const updated = [...newContract.buyerPayments];
+                              updated[0].category = e.target.value;
+                              setNewContract({ ...newContract, buyerPayments: updated });
+                            }}
+                            className="px-3 py-2 border rounded-lg text-sm"
+                          >
+                            <option value="仲介手数料">仲介手数料</option>
+                            <option value="コンサルティング料">コンサルティング料</option>
+                            <option value="手付金">手付金</option>
+                            <option value="残代金清算金">残代金清算金</option>
+                            <option value="その他">その他</option>
+                          </select>
+                          <input
+                            type="number"
+                            placeholder="金額"
+                            value={newContract.buyerPayments[0].amount}
+                            onChange={(e) => {
+                              const updated = [...newContract.buyerPayments];
+                              updated[0].amount = e.target.value;
+                              setNewContract({ ...newContract, buyerPayments: updated });
+                            }}
+                            className="px-3 py-2 border rounded-lg text-sm"
+                          />
+                          <input
+                            type="date"
+                            value={newContract.buyerPayments[0].dueDate}
+                            onChange={(e) => {
+                              const updated = [...newContract.buyerPayments];
+                              updated[0].dueDate = e.target.value;
+                              setNewContract({ ...newContract, buyerPayments: updated });
+                            }}
+                            className="px-3 py-2 border rounded-lg text-sm"
+                          />
+                          <select
+                            value={newContract.buyerPayments[0].method}
+                            onChange={(e) => {
+                              const updated = [...newContract.buyerPayments];
+                              updated[0].method = e.target.value;
+                              setNewContract({ ...newContract, buyerPayments: updated });
+                            }}
+                            className="px-3 py-2 border rounded-lg text-sm"
+                          >
+                            <option value="現金">現金</option>
+                            <option value="振込">振込</option>
+                            <option value="小切手">小切手</option>
+                          </select>
+                          <select
+                            value={newContract.buyerPayments[0].receipt}
+                            onChange={(e) => {
+                              const updated = [...newContract.buyerPayments];
+                              updated[0].receipt = e.target.value;
+                              setNewContract({ ...newContract, buyerPayments: updated });
+                            }}
+                            className="px-3 py-2 border rounded-lg text-sm"
+                          >
+                            <option value="手渡し">手渡し</option>
+                            <option value="郵送">郵送</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 売主からの入金（簡略版、同様の構造） */}
+                  <div className="border border-green-200 rounded-lg p-4 bg-green-50">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <input
+                        type="checkbox"
+                        checked={newContract.sellerPaymentEnabled}
+                        onChange={(e) => setNewContract({ ...newContract, sellerPaymentEnabled: e.target.checked })}
+                        className="w-5 h-5 text-green-600"
+                      />
+                      <label className="font-semibold text-gray-800">売主からの入金分</label>
+                      {newContract.sellerPaymentEnabled && (
+                        <label className="flex items-center space-x-2 ml-auto">
+                          <input
+                            type="checkbox"
+                            checked={newContract.sellerPaymentSplit}
+                            onChange={(e) => setNewContract({ ...newContract, sellerPaymentSplit: e.target.checked })}
+                            className="w-4 h-4 text-gray-600"
+                          />
+                          <span className="text-sm text-gray-600">分かれ</span>
+                        </label>
+                      )}
+                    </div>
+                    {newContract.sellerPaymentEnabled && !newContract.sellerPaymentSplit && (
+                      <div className="grid grid-cols-2 gap-3 mt-3">
+                        <select
+                          value={newContract.sellerPayments[0].category}
+                          onChange={(e) => {
+                            const updated = [...newContract.sellerPayments];
+                            updated[0].category = e.target.value;
+                            setNewContract({ ...newContract, sellerPayments: updated });
+                          }}
+                          className="px-3 py-2 border rounded-lg text-sm"
+                        >
+                          <option value="仲介手数料">仲介手数料</option>
+                          <option value="コンサルティング料">コンサルティング料</option>
+                          <option value="その他">その他</option>
+                        </select>
+                        <input
+                          type="number"
+                          placeholder="金額"
+                          value={newContract.sellerPayments[0].amount}
+                          onChange={(e) => {
+                            const updated = [...newContract.sellerPayments];
+                            updated[0].amount = e.target.value;
+                            setNewContract({ ...newContract, sellerPayments: updated });
+                          }}
+                          className="px-3 py-2 border rounded-lg text-sm"
+                        />
+                        <input
+                          type="date"
+                          value={newContract.sellerPayments[0].dueDate}
+                          onChange={(e) => {
+                            const updated = [...newContract.sellerPayments];
+                            updated[0].dueDate = e.target.value;
+                            setNewContract({ ...newContract, sellerPayments: updated });
+                          }}
+                          className="px-3 py-2 border rounded-lg text-sm"
+                        />
+                        <select
+                          value={newContract.sellerPayments[0].method}
+                          onChange={(e) => {
+                            const updated = [...newContract.sellerPayments];
+                            updated[0].method = e.target.value;
+                            setNewContract({ ...newContract, sellerPayments: updated });
+                          }}
+                          className="px-3 py-2 border rounded-lg text-sm"
+                        >
+                          <option value="現金">現金</option>
+                          <option value="振込">振込</option>
+                          <option value="小切手">小切手</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-gray-500 italic">
+                    ※ その他の入金・支払い項目（業者1-3、支払い等）は登録後に編集画面で追加できます
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-gray-200 p-6 flex justify-between">
+              <button
+                onClick={() => {
+                  if (currentStep === 1) {
+                    setShowNewContract(false);
+                    setCurrentStep(1);
+                  } else {
+                    setCurrentStep(currentStep - 1);
+                  }
+                }}
+                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                {currentStep === 1 ? 'キャンセル' : '戻る'}
+              </button>
+              
+              {currentStep < 7 ? (
+                <button
+                  onClick={() => setCurrentStep(currentStep + 1)}
+                  disabled={!canProceedToNextStep(currentStep)}
+                  className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                    canProceedToNextStep(currentStep)
+                      ? 'bg-blue-500 text-white hover:bg-blue-600'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
+                >
+                  次へ
+                </button>
+              ) : (
+                <button
+                  onClick={handleAddContract}
+                  disabled={!canProceedToNextStep(7)}
+                  className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                    canProceedToNextStep(7)
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:shadow-lg'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
+                >
+                  物件を登録
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 物件編集モーダル */}
+      {showEditContract && editingContract && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col relative z-[101]">
+            <div className="bg-gradient-to-r from-blue-500 to-purple-500 border-b border-gray-200 p-6 rounded-t-2xl flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <h3 className="text-2xl font-bold text-white">物件情報を編集</h3>
+                <button 
+                  onClick={() => {
+                    setShowEditContract(false);
+                    setEditingContract(null);
+                  }}
+                  className="text-white hover:text-gray-200"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-6 overflow-y-auto flex-1">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">物件種別 *</label>
+                  <select
+                    value={editingContract.propertyType}
+                    onChange={(e) => setEditingContract({ ...editingContract, propertyType: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    {propertyTypes.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">取引種別 *</label>
+                  <select
+                    value={editingContract.dealType}
+                    onChange={(e) => setEditingContract({ ...editingContract, dealType: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    {dealTypes.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">物件住所 *</label>
+                  <input
+                    type="text"
+                    value={editingContract.address}
+                    onChange={(e) => setEditingContract({ ...editingContract, address: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="例: 東京都渋谷区神宮前1-1-1"
+                  />
+                </div>
+
+                {(editingContract.propertyType === 'マンション' || editingContract.propertyType === '収益物件') && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">物件名</label>
+                      <input
+                        type="text"
+                        value={editingContract.propertyName || ''}
+                        onChange={(e) => setEditingContract({ ...editingContract, propertyName: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="例: パークマンション渋谷"
+                      />
+                    </div>
+                    {editingContract.propertyType === 'マンション' && (
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">号室</label>
+                        <input
+                          type="text"
+                          value={editingContract.roomNumber || ''}
+                          onChange={(e) => setEditingContract({ ...editingContract, roomNumber: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          placeholder="例: 305"
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">買主名前 *</label>
+                  <input
+                    type="text"
+                    value={editingContract.buyerName}
+                    onChange={(e) => setEditingContract({ ...editingContract, buyerName: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="例: 田中太郎"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">買主フリガナ</label>
+                  <input
+                    type="text"
+                    value={editingContract.buyerKana || ''}
+                    onChange={(e) => setEditingContract({ ...editingContract, buyerKana: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="例: タナカタロウ"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">売主名前 *</label>
+                  <input
+                    type="text"
+                    value={editingContract.sellerName}
+                    onChange={(e) => setEditingContract({ ...editingContract, sellerName: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="例: 山田次郎"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">売主フリガナ</label>
+                  <input
+                    type="text"
+                    value={editingContract.sellerKana || ''}
+                    onChange={(e) => setEditingContract({ ...editingContract, sellerKana: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="例: ヤマダジロウ"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">物件金額 *</label>
+                  <input
+                    type="number"
+                    value={editingContract.propertyPrice}
+                    onChange={(e) => setEditingContract({ ...editingContract, propertyPrice: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="例: 50000000"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">物件残債</label>
+                  <input
+                    type="number"
+                    value={editingContract.outstandingDebt}
+                    onChange={(e) => setEditingContract({ ...editingContract, outstandingDebt: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="例: 30000000"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">契約日 *</label>
+                  <input
+                    type="date"
+                    value={editingContract.contractDate}
+                    onChange={(e) => setEditingContract({ ...editingContract, contractDate: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">決済期日 *</label>
+                  <input
+                    type="date"
+                    value={editingContract.settlementDeadline}
+                    onChange={(e) => setEditingContract({ ...editingContract, settlementDeadline: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">確定決済日</label>
+                  <input
+                    type="date"
+                    value={editingContract.confirmedSettlementDate || ''}
+                    onChange={(e) => setEditingContract({ ...editingContract, confirmedSettlementDate: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">進捗率 (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={editingContract.progress}
+                    onChange={(e) => setEditingContract({ ...editingContract, progress: parseInt(e.target.value) || 0 })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">営業所 *</label>
+                  <select
+                    value={editingContract.officeId}
+                    onChange={(e) => setEditingContract({ ...editingContract, officeId: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">選択してください</option>
+                    {offices.map(office => (
+                      <option key={office.id} value={office.id}>{office.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">担当者 *</label>
+                  <select
+                    value={editingContract.assigneeId}
+                    onChange={(e) => setEditingContract({ ...editingContract, assigneeId: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    disabled={!editingContract.officeId}
+                  >
+                    <option value="">選択してください</option>
+                    {editingContract.officeId && getOfficeStaff(parseInt(editingContract.officeId)).map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-span-2 border-t border-gray-200 pt-4">
+                  <h4 className="font-semibold text-gray-800 mb-3">オプション設定</h4>
+                  <div className="grid grid-cols-3 gap-3">
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editingContract.loanUsage}
+                        onChange={(e) => setEditingContract({ ...editingContract, loanUsage: e.target.checked })}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <span className="text-sm">買主ローン使用</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editingContract.mortgageRemoval}
+                        onChange={(e) => setEditingContract({ ...editingContract, mortgageRemoval: e.target.checked })}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <span className="text-sm">抵当権抹消</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editingContract.renovation}
+                        onChange={(e) => setEditingContract({ ...editingContract, renovation: e.target.checked })}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <span className="text-sm">リフォーム</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editingContract.demolition}
+                        onChange={(e) => setEditingContract({ ...editingContract, demolition: e.target.checked })}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <span className="text-sm">解体</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editingContract.survey}
+                        onChange={(e) => setEditingContract({ ...editingContract, survey: e.target.checked })}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <span className="text-sm">測量</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editingContract.arrears}
+                        onChange={(e) => setEditingContract({ ...editingContract, arrears: e.target.checked })}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <span className="text-sm">滞納あり</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 mt-4">
+                <button
+                  onClick={() => {
+                    setShowEditContract(false);
+                    setEditingContract(null);
+                  }}
+                  className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleSaveContract}
+                  className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg font-semibold hover:shadow-lg transition-all flex items-center space-x-2"
+                >
+                  <Save className="w-5 h-5" />
+                  <span>変更を保存</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 入金・支払い詳細モーダル */}
+      {showPaymentDetail && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl relative z-[101]">
+            <div className={`border-b border-gray-200 p-6 ${
+              showPaymentDetail.type === '入金' 
+                ? 'bg-gradient-to-r from-green-500 to-green-600' 
+                : 'bg-gradient-to-r from-red-500 to-red-600'
+            }`}>
+              <div className="flex items-center justify-between">
+                <h3 className="text-2xl font-bold text-white flex items-center">
+                  <DollarSign className="w-7 h-7 mr-2" />
+                  {showPaymentDetail.type === '入金' ? '入金' : '支払い'}詳細
+                </h3>
+                <button 
+                  onClick={() => setShowPaymentDetail(null)}
+                  className="text-white hover:text-gray-200"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              {(() => {
+                const contract = contracts.find(c => c.id === showPaymentDetail.contractId);
+                return (
+                  <div className="space-y-4">
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-semibold text-gray-800 mb-3">取引情報</h4>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <div className="text-gray-600 mb-1">タイトル</div>
+                          <div className="font-semibold text-gray-800">{showPaymentDetail.title}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-600 mb-1">金額</div>
+                          <div className="font-bold text-2xl text-gray-800">
+                            ¥{showPaymentDetail.amount?.toLocaleString()}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-gray-600 mb-1">種類</div>
+                          <div className="font-semibold text-gray-800">{showPaymentDetail.type}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-600 mb-1">期日</div>
+                          <div className="font-semibold text-gray-800">{showPaymentDetail.dueDate}</div>
+                        </div>
+                        {showPaymentDetail.purpose && (
+                          <div className="col-span-2">
+                            <div className="text-gray-600 mb-1">名目</div>
+                            <div className="font-semibold text-gray-800">{showPaymentDetail.purpose}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {contract && (
+                      <>
+                        <div className="bg-blue-50 rounded-lg p-4">
+                          <h4 className="font-semibold text-gray-800 mb-3">物件情報</h4>
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <div className="text-gray-600 mb-1">物件種別</div>
+                              <div className="font-semibold text-gray-800">{contract.propertyType}</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-600 mb-1">取引種別</div>
+                              <div className="font-semibold text-gray-800">{contract.dealType}</div>
+                            </div>
+                            <div className="col-span-2">
+                              <div className="text-gray-600 mb-1">
+                                {contract.propertyType === 'マンション' ? '物件名・号室' : '所在地'}
+                              </div>
+                              <div className="font-semibold text-gray-800">
+                                {contract.propertyType === 'マンション' 
+                                  ? `${contract.propertyName} - ${contract.roomNumber}`
+                                  : contract.address
+                                }
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-gray-600 mb-1">
+                                {showPaymentDetail.type === '入金' ? '入金元（買主）' : '支払先（売主）'}
+                              </div>
+                              <div className="font-semibold text-gray-800">
+                                {showPaymentDetail.type === '入金' ? contract.buyerName : contract.sellerName}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-gray-600 mb-1">物件金額</div>
+                              <div className="font-semibold text-gray-800">
+                                ¥{contract.propertyPrice.toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="bg-purple-50 rounded-lg p-4">
+                          <h4 className="font-semibold text-gray-800 mb-3">担当情報</h4>
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <div className="text-gray-600 mb-1">営業所</div>
+                              <div className="font-semibold text-gray-800 flex items-center">
+                                <Building2 className="w-4 h-4 mr-2 text-purple-600" />
+                                {getOfficeName(contract.officeId)}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-gray-600 mb-1">担当者</div>
+                              <div className="font-semibold text-gray-800 flex items-center">
+                                <User className="w-4 h-4 mr-2 text-purple-600" />
+                                {getStaffName(contract.assigneeId)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {showPaymentDetail.paymentMethod && (
+                      <div className="bg-orange-50 rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-800 mb-3">支払・受取方法</h4>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <div className="text-gray-600 mb-1">
+                              {showPaymentDetail.type === '入金' ? '受取方法' : '支払方法'}
+                            </div>
+                            <div className="font-semibold text-gray-800">{showPaymentDetail.paymentMethod}</div>
+                          </div>
+                          {showPaymentDetail.receiptDelivery && (
+                            <div>
+                              <div className="text-gray-600 mb-1">領収書配送</div>
+                              <div className="font-semibold text-gray-800">{showPaymentDetail.receiptDelivery}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-end space-x-3 pt-4">
+                      {isToday(showPaymentDetail.dueDate) && !showPaymentDetail.paymentCompleted && (
+                        <button
+                          onClick={() => handlePaymentComplete(showPaymentDetail.id, showPaymentDetail.type)}
+                          className={`px-6 py-3 rounded-lg font-semibold transition-all flex items-center space-x-2 ${
+                            showPaymentDetail.type === '入金'
+                              ? 'bg-green-500 text-white hover:bg-green-600'
+                              : 'bg-red-500 text-white hover:bg-red-600'
+                          }`}
+                        >
+                          <Check className="w-5 h-5" />
+                          <span>{showPaymentDetail.type === '入金' ? '入金完了' : '支払完了'}</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setShowPaymentDetail(null)}
+                        className="px-6 py-2 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors"
+                      >
+                        閉じる
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* タスク詳細モーダル - 編集機能付き */}
+      {showTaskDetail && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl relative z-[101]">
+            <div className="border-b border-gray-200 p-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-2xl font-bold text-gray-800">{showTaskDetail.title}</h3>
+                <div className="flex items-center space-x-2">
+                  {!isEditingTask && (
+                    <button 
+                      onClick={handleEditTask}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    >
+                      <Edit2 className="w-5 h-5" />
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => {
+                      setShowTaskDetail(null);
+                      setIsEditingTask(false);
+                      setEditedTask(null);
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              {isEditingTask ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">タイトル</label>
+                    <input
+                      type="text"
+                      value={editedTask.title}
+                      onChange={(e) => setEditedTask({ ...editedTask, title: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">期日</label>
+                      <input
+                        type="date"
+                        value={editedTask.dueDate}
+                        onChange={(e) => setEditedTask({ ...editedTask, dueDate: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">優先度</label>
+                      <select
+                        value={editedTask.priority}
+                        onChange={(e) => setEditedTask({ ...editedTask, priority: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="high">高</option>
+                        <option value="medium">中</option>
+                        <option value="low">低</option>
+                      </select>
+                    </div>
+                  </div>
+                  {editedTask.amount !== undefined && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">金額</label>
+                      <input
+                        type="number"
+                        value={editedTask.amount}
+                        onChange={(e) => setEditedTask({ ...editedTask, amount: parseInt(e.target.value) })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  )}
+                  <div className="flex space-x-3 pt-4">
+                    <button
+                      onClick={handleCancelEdit}
+                      className="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      onClick={handleSaveTask}
+                      className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 transition-colors flex items-center justify-center space-x-2"
+                    >
+                      <Save className="w-5 h-5" />
+                      <span>保存</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">タスク種別</label>
+                      <div className="text-gray-800">{showTaskDetail.type}</div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">期日</label>
+                      <div className="text-gray-800">{showTaskDetail.dueDate}</div>
+                    </div>
+                    {showTaskDetail.amount && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1">金額</label>
+                          <div className="text-gray-800">¥{showTaskDetail.amount.toLocaleString()}</div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1">名目</label>
+                          <div className="text-gray-800">{showTaskDetail.purpose}</div>
+                        </div>
+                      </>
+                    )}
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">優先度</label>
+                      <div className="text-gray-800">{showTaskDetail.priority === 'high' ? '高' : showTaskDetail.priority === 'medium' ? '中' : '低'}</div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">ステータス</label>
+                      <div className="text-gray-800">
+                        {showTaskDetail.status === 'pending' ? '未着手' : showTaskDetail.status === 'in-progress' ? '進行中' : '完了'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-200 pt-4">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">書類アップロード</label>
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                      <Upload className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500 text-sm">ファイルをドラッグ＆ドロップ</p>
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-3 pt-4">
+                    <button 
+                      onClick={() => {
+                        updateTaskStatus(showTaskDetail.id, 'in-progress');
+                        setShowTaskDetail(null);
+                        alert('担当者確認が完了しました');
+                      }}
+                      className="flex-1 bg-blue-500 text-white py-3 rounded-lg font-semibold hover:bg-blue-600 transition-colors"
+                    >
+                      担当者確認
+                    </button>
+                    <button 
+                      onClick={() => {
+                        updateTaskStatus(showTaskDetail.id, 'in-progress');
+                        setShowTaskDetail(null);
+                        alert('所長確認が完了しました');
+                      }}
+                      className="flex-1 bg-purple-500 text-white py-3 rounded-lg font-semibold hover:bg-purple-600 transition-colors"
+                    >
+                      所長確認
+                    </button>
+                    <button 
+                      onClick={() => {
+                        updateTaskStatus(showTaskDetail.id, 'done');
+                        setShowTaskDetail(null);
+                        alert('タスクが完了しました');
+                      }}
+                      className="flex-1 bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition-colors"
+                    >
+                      完了
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 営業所追加モーダル */}
+      {showAddOffice && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative z-[101]">
+            <div className="border-b border-gray-200 p-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-2xl font-bold text-gray-800">営業所を追加</h3>
+                <button onClick={() => setShowAddOffice(false)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">営業所名 *</label>
+                <input
+                  type="text"
+                  value={newOffice.name}
+                  onChange={(e) => setNewOffice({ ...newOffice, name: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  placeholder="例: 渋谷営業所"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">住所 *</label>
+                <input
+                  type="text"
+                  value={newOffice.address}
+                  onChange={(e) => setNewOffice({ ...newOffice, address: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  placeholder="例: 東京都渋谷区"
+                />
+              </div>
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  onClick={() => setShowAddOffice(false)}
+                  className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleAddOffice}
+                  className="px-6 py-2 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600"
+                >
+                  追加
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* スタッフ追加モーダル */}
+      {showAddStaff && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative z-[101]">
+            <div className="border-b border-gray-200 p-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-2xl font-bold text-gray-800">スタッフを追加</h3>
+                <button onClick={() => setShowAddStaff(false)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">名前 *</label>
+                <input
+                  type="text"
+                  value={newStaff.name}
+                  onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="例: 山田花子"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">営業所 *</label>
+                <select
+                  value={newStaff.officeId}
+                  onChange={(e) => setNewStaff({ ...newStaff, officeId: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">選択してください</option>
+                  {offices.map(office => (
+                    <option key={office.id} value={office.id}>{office.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">役職</label>
+                <select
+                  value={newStaff.role}
+                  onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="営業担当">営業担当</option>
+                  <option value="所長">所長</option>
+                  <option value="経理">経理</option>
+                  <option value="事務">事務</option>
+                </select>
+              </div>
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  onClick={() => setShowAddStaff(false)}
+                  className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleAddStaff}
+                  className="px-6 py-2 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600"
+                >
+                  追加
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default RealEstateTaskManager;
+
+</script>
+</body>
+</html>

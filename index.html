@@ -154,23 +154,75 @@
         { id: 6, contractId: 1, type: '収入印紙手配', title: '売主 収入印紙手配', stampAmount: 20000, dueDate: '2025-11-28', status: 'pending', assigneeId: 1, priority: 'high', party: '売主', paymentCompleted: false }
       ]);
 
-      const [offices, setOffices] = useState([
-        { id: 1, name: '渋谷営業所', address: '東京都渋谷区' },
-        { id: 2, name: '新宿営業所', address: '東京都新宿区' },
-        { id: 3, name: '横浜営業所', address: '神奈川県横浜市' }
-      ]);
+      // ==== 営業所・スタッフ管理（紐づけ対応） ====
+const [offices, setOffices] = useState([
+  {
+    id: 1,
+    name: '渋谷営業所',
+    address: '東京都渋谷区',
+    staff: [
+      { id: 1, name: '山田花子', role: '営業担当' },
+      { id: 2, name: '鈴木一郎', role: '営業担当' }
+    ]
+  },
+  {
+    id: 2,
+    name: '新宿営業所',
+    address: '東京都新宿区',
+    staff: [
+      { id: 3, name: '田中次郎', role: '所長' },
+      { id: 4, name: '佐藤美咲', role: '経理' }
+    ]
+  }
+]);
 
-      const [staff, setStaff] = useState([
-        { id: 1, name: '山田花子', officeId: 1, role: '営業担当' },
-        { id: 2, name: '鈴木一郎', officeId: 1, role: '営業担当' },
-        { id: 3, name: '田中次郎', officeId: 2, role: '所長' },
-        { id: 4, name: '佐藤美咲', officeId: 2, role: '経理' }
-      ]);
+const [newOffice, setNewOffice] = useState({ name: '', address: '' });
+const [newStaff, setNewStaff] = useState({ name: '', role: '営業担当', officeId: null });
 
-      const [showAddOffice, setShowAddOffice] = useState(false);
-      const [showAddStaff, setShowAddStaff] = useState(false);
-      const [newOffice, setNewOffice] = useState({ name: '', address: '' });
-      const [newStaff, setNewStaff] = useState({ name: '', officeId: '', role: '営業担当', email: '' });
+// 営業所追加
+const addOffice = () => {
+  if (!newOffice.name.trim() || !newOffice.address.trim()) return;
+  const newId = offices.length ? Math.max(...offices.map(o => o.id)) + 1 : 1;
+  setOffices([...offices, { id: newId, ...newOffice, staff: [] }]);
+  setNewOffice({ name: '', address: '' });
+};
+
+// 営業所削除
+const removeOffice = (id) => {
+  if (confirm('この営業所を削除しますか？')) {
+    setOffices(offices.filter(o => o.id !== id));
+  }
+};
+
+// スタッフ追加
+const addStaff = () => {
+  if (!newStaff.name.trim() || !newStaff.officeId) return;
+  const updatedOffices = offices.map(o => {
+    if (o.id === parseInt(newStaff.officeId)) {
+      const newId =
+        o.staff.length > 0 ? Math.max(...o.staff.map(s => s.id)) + 1 : 1;
+      return {
+        ...o,
+        staff: [...o.staff, { id: newId, name: newStaff.name, role: newStaff.role }]
+      };
+    }
+    return o;
+  });
+  setOffices(updatedOffices);
+  setNewStaff({ name: '', role: '営業担当', officeId: null });
+};
+
+// スタッフ削除
+const removeStaff = (officeId, staffId) => {
+  const updatedOffices = offices.map(o => {
+    if (o.id === officeId) {
+      return { ...o, staff: o.staff.filter(s => s.id !== staffId) };
+    }
+    return o;
+  });
+  setOffices(updatedOffices);
+};
+
 
       const propertyTypes = ['マンション', '土地', '戸建て', '収益物件', '事業用物件'];
       const dealTypes = ['買取再販', '仲介'];

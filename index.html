@@ -342,13 +342,29 @@ const removeStaff = (officeId, staffId) => {
       };
 
       const handleAddStaff = () => {
-        if (newStaff.name && newStaff.officeId) {
-          setStaff([...staff, { id: staff.length + 1, ...newStaff, officeId: parseInt(newStaff.officeId) }]);
-          setNewStaff({ name: '', officeId: '', role: '営業担当', email: '' });
-          setShowAddStaff(false);
-        }
-      };
+  if (!newStaff.name || !newStaff.officeId) return;
 
+  setOffices(prev =>
+    prev.map(o =>
+      o.id === parseInt(newStaff.officeId)
+        ? {
+            ...o,
+            staff: [
+              ...o.staff,
+              {
+                id: o.staff.length ? Math.max(...o.staff.map(s => s.id)) + 1 : 1,
+                name: newStaff.name,
+                role: newStaff.role,
+              },
+            ],
+          }
+        : o
+    )
+  );
+
+  setNewStaff({ name: '', officeId: '', role: '営業担当' });
+  setShowAddStaff(false);
+};
       const getTaskIcon = (type) => {
         switch(type) {
           case '入金': return DollarSign;

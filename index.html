@@ -229,11 +229,7 @@ const removeStaff = (officeId, staffId) => {
 
       
 
-      const handleDeleteStaff = (staffId) => {
-        if (confirm('このスタッフを削除しますか？')) {
-          setStaff(prev => prev.filter(s => s.id !== staffId));
-        }
-      };
+      
 
       const updateTaskStatus = (taskId, newStatus) => {
         setTasks(prev => prev.map(t => (t.id === taskId ? { ...t, status: newStatus } : t)));

@@ -227,16 +227,7 @@ const removeStaff = (officeId, staffId) => {
       const propertyTypes = ['マンション', '土地', '戸建て', '収益物件', '事業用物件'];
       const dealTypes = ['買取再販', '仲介'];
 
-      const getOfficeName = (officeId) => offices.find(o => o.id === officeId)?.name || '未設定';
-      const getStaffName = (staffId) => staff.find(s => s.id === staffId)?.name || '未割当';
-      const getOfficeStaff = (officeId) => staff.filter(s => s.officeId === officeId);
-
-      const handleDeleteOffice = (officeId) => {
-        if (confirm('この営業所を削除しますか？')) {
-          setOffices(prev => prev.filter(o => o.id !== officeId));
-          setStaff(prev => prev.filter(s => s.officeId !== officeId));
-        }
-      };
+      
 
       const handleDeleteStaff = (staffId) => {
         if (confirm('このスタッフを削除しますか？')) {
@@ -938,59 +929,126 @@ const removeStaff = (officeId, staffId) => {
           )}
 
           {view === 'office' && (
-            <div className="max-w-7xl mx-auto px-4 py-6">
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-                    <MapPin className="w-7 h-7 mr-3 text-orange-600" />
-                    営業所・スタッフ管理
-                  </h2>
-                  <div className="flex space-x-3">
-                    <button onClick={() => setShowAddStaff(true)} className="px-4 py-2 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 flex items-center space-x-2">
-                      <Plus className="w-5 h-5" />
-                      <span>スタッフ追加</span>
-                    </button>
-                    <button onClick={() => setShowAddOffice(true)} className="px-4 py-2 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 flex items-center space-x-2">
-                      <Plus className="w-5 h-5" />
-                      <span>営業所追加</span>
-                    </button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-6">
-                  {offices.map(office => (
-                    <div key={office.id} className="border-2 border-orange-200 rounded-xl p-5">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-xl font-bold text-gray-800">{office.name}</h3>
-                        <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm font-semibold">
-                          {getOfficeStaff(office.id).length}名
-                        </span>
-                      </div>
-                      <p className="text-gray-600 text-sm mb-4 flex items-center">
-                        <MapPin className="w-4 h-4 mr-1" />
-                        {office.address}
-                      </p>
-                      <div className="border-t border-gray-200 pt-4">
-                        <h4 className="font-semibold text-gray-700 mb-3 text-sm">所属スタッフ</h4>
-                        <div className="space-y-2">
-                          {getOfficeStaff(office.id).map(s => (
-                            <div key={s.id} className="flex items-center space-x-3 bg-gray-50 rounded-lg p-3">
-                              <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-400 rounded-full flex items-center justify-center text-white font-bold">
-                                {s.name[0]}
-                              </div>
-                              <div>
-                                <div className="font-semibold text-sm text-gray-800">{s.name}</div>
-                                <div className="text-xs text-gray-500">{s.role}</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+  <div className="max-w-7xl mx-auto px-4 py-6">
+    <div className="bg-white rounded-xl shadow-lg p-6">
+      <h2 className="text-2xl font-bold text-gray-800 mb-6">営業所・スタッフ管理</h2>
+
+      {/* 営業所追加フォーム */}
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold text-gray-700 mb-3">営業所を追加</h3>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="営業所名"
+            value={newOffice.name}
+            onChange={(e) => setNewOffice({ ...newOffice, name: e.target.value })}
+            className="border px-4 py-2 rounded-lg flex-1"
+          />
+          <input
+            type="text"
+            placeholder="住所"
+            value={newOffice.address}
+            onChange={(e) => setNewOffice({ ...newOffice, address: e.target.value })}
+            className="border px-4 py-2 rounded-lg flex-1"
+          />
+          <button
+            onClick={addOffice}
+            className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+          >
+            営業所追加
+          </button>
+        </div>
+      </div>
+
+      {/* 営業所リスト */}
+      <div className="space-y-6">
+        {offices.map((office) => (
+          <div key={office.id} className="border rounded-xl p-5 shadow-sm bg-gray-50">
+            {/* 営業所ヘッダー */}
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-800">{office.name}</h3>
+                <p className="text-sm text-gray-600">{office.address}</p>
               </div>
+              <button
+                onClick={() => removeOffice(office.id)}
+                className="text-sm bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600"
+              >
+                営業所削除
+              </button>
             </div>
-          )}
+
+            {/* スタッフ一覧 */}
+            <div className="mb-3">
+              <h4 className="font-semibold text-gray-700 mb-2">所属スタッフ</h4>
+              {office.staff.length === 0 ? (
+                <p className="text-sm text-gray-500">スタッフが登録されていません。</p>
+              ) : (
+                <ul className="space-y-2">
+                  {office.staff.map((s) => (
+                    <li
+                      key={s.id}
+                      className="flex justify-between items-center bg-white rounded-lg p-3 shadow-sm"
+                    >
+                      <div>
+                        <p className="font-semibold text-gray-800">{s.name}</p>
+                        <p className="text-xs text-gray-500">{s.role}</p>
+                      </div>
+                      <button
+                        onClick={() => removeStaff(office.id, s.id)}
+                        className="text-sm bg-red-400 text-white px-2 py-1 rounded hover:bg-red-500"
+                      >
+                        削除
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* スタッフ追加フォーム */}
+            <div className="flex gap-2 mt-3">
+              <input
+                type="text"
+                placeholder="スタッフ名"
+                value={newStaff.officeId === office.id ? newStaff.name : ''}
+                onChange={(e) => {
+                  setNewStaff({
+                    ...newStaff,
+                    officeId: office.id,
+                    name: e.target.value,
+                  });
+                }}
+                className="border px-3 py-2 rounded-lg flex-1"
+              />
+              <select
+                value={newStaff.officeId === office.id ? newStaff.role : '営業担当'}
+                onChange={(e) =>
+                  setNewStaff({
+                    ...newStaff,
+                    officeId: office.id,
+                    role: e.target.value,
+                  })
+                }
+                className="border px-3 py-2 rounded-lg"
+              >
+                <option value="営業担当">営業担当</option>
+                <option value="所長">所長</option>
+                <option value="経理">経理</option>
+              </select>
+              <button
+                onClick={addStaff}
+                className="bg-green-500 text-white px-3 py-2 rounded-lg hover:bg-green-600"
+              >
+                スタッフ追加
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
 
           {showPaymentDetail && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

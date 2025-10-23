@@ -582,8 +582,8 @@ const removeStaff = (officeId, staffId) => {
                               <span>売主: {contract.sellerName}</span>
                               <span>物件金額: ¥{contract.propertyPrice.toLocaleString()}</span>
                               <span>契約日: {contract.contractDate}</span>
-                              <span>営業所: {getOfficeName(contract.officeId)}</span>
-                              <span>担当: {getStaffName(contract.assigneeId)}</span>
+                             <span>営業所ID: {contract.officeId}</span>
+<span>担当ID: {contract.assigneeId}</span>
                             </div>
                           </div>
                           <div className="ml-6">
